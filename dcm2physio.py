@@ -47,6 +47,7 @@ __version__ = '1.1.1'
 
 import os
 import argparse
+import pandas as pd
 import numpy as np
 import pydicom
 from scipy.interpolate import interp1d
@@ -56,27 +57,13 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Convert DICOM files to BIDS-compliant Nifty structure')
-
-    parser.add_argument('-i', '--indir', default='dicom',
-                        help='DICOM input directory with Subject/Session/Image organization [dicom]')
-
-    parser.add_argument('-o', '--outdir', default='source',
-                        help='Output BIDS source directory [source]')
-
-    parser.add_argument('--no-sessions', action='store_true', default=False,
-                        help='Do not use session sub-directories')
-
-    parser.add_argument('--overwrite', action='store_true', default=False,
-                        help='Overwrite existing files')
-
-    # Parse command line arguments
+    parser.add_argument('-i', '--infile', help='CMRR physio DICOM file')
     args = parser.parse_args()
-    dcm_root_dir = os.path.realpath(args.indir)
-    no_sessions = args.no_sessions
-    overwrite = args.overwrite
+
+    physio_dcm = args.infile
 
     # Create DICOM object
-    d = pydicom.read_file('physio.dcm')
+    d = pydicom.read_file(physio_dcm)
 
     # Extract data from Siemens spectroscopy tag (0x7fe1, 0x1010)
     # Convert from a bytes literal to a UTF-8 encoded string, ignoring errors
@@ -136,7 +123,18 @@ def main():
     f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
     s_resp_i = f(t_puls)
 
+    # Create a dataframe from a data dictionary
+    d = {'Time_s':t_puls, 'Pulse':s_puls, 'Resp': s_resp_i}
+    df = pd.DataFrame(d)
+
     # Export pulse and respiratory waveforms to TSV file
+    tsv_fname = os.path.splitext(physio_dcm)[0]+'.tsv'
+    print('Saving pulse and respiratory waveforms to %s' % tsv_fname)
+    df.to_csv(tsv_fname,
+              sep='\t',
+              columns=['Time_s', 'Pulse', 'Resp'],
+              index=False,
+              float_format='%0.3f')
 
 
 # This is the standard boilerplate that calls the main() function.
