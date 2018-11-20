@@ -16,7 +16,7 @@ Mike Tyszka, Caltech Brain Imaging Center
 Dates
 ----
 2018-03-29 JMT From scratch
-2018-11-19 JMT Port parsing logic from extractCMRRPhysio.m (Ed Auerbach)
+2018-11-19 JMT Adapt parsing logic from extractCMRRPhysio.m (Ed Auerbach)
 
 References
 ----
@@ -47,7 +47,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-__version__ = '1.1.1'
+__version__ = '1.2.0'
 
 
 import os
@@ -92,6 +92,10 @@ def main():
     n_waves = int(n_cols / 1024)
     wave_len = int(n_points / n_waves)
 
+    # Init time and waveform vectors
+    t_puls, s_puls, dt_puls = [], [], 1.0
+    t_resp, s_resp, dt_resp = [], [], 1.0
+
     for wc in range(n_waves):
 
         print('')
@@ -113,29 +117,39 @@ def main():
         log_bytes = wave_data[slice(1024, 1024+data_len)]
 
         # Parse waveform log
-        t_puls, s_puls, t_resp, s_resp = parse_log(log_bytes)
-#
-#     # Zero time origin (identical offset for all waveforms) and scale to seconds
-#     t_puls = (t_puls - t_puls[0]) * dt_puls
-#     t_resp = (t_resp - t_resp[0]) * dt_resp
-#
-#     # Resample respiration waveform to match pulse waveform timing
-#     f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
-#     s_resp_i = f(t_puls)
-#
-#     # Create a dataframe from a data dictionary
-#     d = {'Time_s':t_puls, 'Pulse':s_puls, 'Resp': s_resp_i}
-#     df = pd.DataFrame(d)
-#
-#     # Export pulse and respiratory waveforms to TSV file
-#     tsv_fname = os.path.splitext(physio_dcm)[0]+'.tsv'
-#     print('Saving pulse and respiratory waveforms to %s' % tsv_fname)
-#     df.to_csv(tsv_fname,
-#               sep='\t',
-#               columns=['Time_s', 'Pulse', 'Resp'],
-#               index=False,
-#               float_format='%0.3f')
-#
+        waveform_name, t, s, dt = parse_log(log_bytes)
+
+        if "PULS" in waveform_name:
+            t_puls, s_puls, dt_puls = t, s, dt
+
+        if "RESP" in waveform_name:
+            t_resp, s_resp, dt_resp = t, s, dt
+
+    # Zero time origin (identical offset for all waveforms) and scale to seconds
+    t_puls = (t_puls - t_puls[0]) * dt_puls
+    t_resp = (t_resp - t_resp[0]) * dt_resp
+
+    # Resample respiration waveform to match pulse waveform timing
+    f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
+    s_resp_i = f(t_puls)
+
+    # Create a dataframe from a data dictionary
+    d = {'Time_s':t_puls, 'Pulse':s_puls, 'Resp': s_resp_i}
+    df = pd.DataFrame(d)
+
+    # Export pulse and respiratory waveforms to TSV file
+    tsv_fname = os.path.splitext(physio_dcm)[0]+'.tsv'
+
+    print('')
+    print('Saving pulse and respiratory waveforms to %s' % tsv_fname)
+
+    df.to_csv(tsv_fname,
+              sep='\t',
+              columns=['Time_s', 'Pulse', 'Resp'],
+              index=False,
+              float_format='%0.3f')
+
+
 def parse_log(log_bytes):
 
     # Convert from a bytes literal to a UTF-8 encoded string, ignoring errors
@@ -144,42 +158,45 @@ def parse_log(log_bytes):
     # CMRR DICOM physio log has \n separated lines
     physio_lines = physio_string.splitlines()
 
-    # Parse the pulse and respiratory waveforms to a numpy array
-
-    t_puls = []
-    t_resp = []
-    s_puls = []
-    s_resp = []
-
-    current_waveform = ''
+    # Init parameters and lists
+    uuid = "UNKNOWN"
+    waveform_name = "UNKNOWN"
+    scan_date = "UNKNOWN"
+    dt = 1.0
+    t_list, s_list = [], []
 
     for line in physio_lines:
 
+        # Divide the line at whitespace
         parts = line.split()
 
-        if len(parts) > 2:
+        # Data lines have the form "<tag> = <value>" or "<time> <name> <signal>"
+        if len(parts) == 3:
 
-            if 'ScanDate' in parts[0]:
-                scan_date = parts[2]
+            p1, p2, p3 = parts
 
-            if 'LogDataType' in parts[0]:
-                current_waveform = parts[2]
+            if 'UUID' in p1:
+                uuid = p3
 
-            if 'SampleTime' in parts[0]:
-                dt_puls = float(parts[2]) * 1e-3
+            if 'ScanDate' in p1:
+                scan_date = p3
 
-                if 'RESP' in current_waveform:
-                    dt_resp = float(parts[2]) * 1e-3
+            if 'LogDataType' in p1:
+                waveform_name = p3
 
-            if 'PULS' in parts[1]:
-                t_puls.append(float(parts[0]))
-                s_puls.append(float(parts[2]))
+            if 'SampleTime' in p1:
+                dt = float(p3) * 1e-3
 
-            if 'RESP' in parts[1]:
-                t_resp.append(float(parts[0]))
-                s_resp.append(float(parts[2]))
+            if 'PULS' in p2 or 'RESP' in p2:
+                t_list.append(float(p1))
+                s_list.append(float(p3))
 
-    return t_puls, s_puls, t_resp, s_resp
+    print('UUID            : %s' % uuid)
+    print('Scan date       : %s' % scan_date)
+    print('Waveform type   : %s' % waveform_name)
+
+    # Return numpy arrays
+    return waveform_name, np.array(t_list), np.array(s_list), dt
 
 
 # This is the standard boilerplate that calls the main() function.
