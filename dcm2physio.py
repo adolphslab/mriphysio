@@ -16,6 +16,11 @@ Mike Tyszka, Caltech Brain Imaging Center
 Dates
 ----
 2018-03-29 JMT From scratch
+2018-11-19 JMT Port parsing logic from extractCMRRPhysio.m (Ed Auerbach)
+
+References
+----
+Matlab parser: https://github.com/CMRR-C2P/MB/blob/master/extractCMRRPhysio.m
 
 License
 ----
@@ -46,6 +51,7 @@ __version__ = '1.1.1'
 
 
 import os
+import sys
 import argparse
 import pandas as pd
 import numpy as np
@@ -57,17 +63,83 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Convert DICOM files to BIDS-compliant Nifty structure')
-    parser.add_argument('-i', '--infile', help='CMRR physio DICOM file')
+    parser.add_argument('-i', '--infile', required=True, help='CMRR physio DICOM file')
     args = parser.parse_args()
 
     physio_dcm = args.infile
 
     # Create DICOM object
-    d = pydicom.read_file(physio_dcm)
+    d = pydicom.dcmread(physio_dcm, stop_before_pixels=True)
 
     # Extract data from Siemens spectroscopy tag (0x7fe1, 0x1010)
+    # Yields one long byte array
+    physio_data = d[0x7fe1, 0x1010].value
+
+    # Extract relevant info from header
+    n_points = len(physio_data)
+    n_rows = d.AcquisitionNumber
+
+    if (n_points % n_rows):
+        print('* Points (%d) is not an integer multiple of rows (%d) - exiting' % (n_points, n_rows))
+        sys.exit(-1)
+
+    n_cols = int(n_points / n_rows)
+
+    if (n_points % 1024):
+        print('* Columns (%d) is not an integer multiple of 1024 (%d) - exiting' % (n_cols, 1024))
+        sys.exit(-1)
+
+    n_waves = int(n_cols / 1024)
+    wave_len = int(n_points / n_waves)
+
+    for wc in range(n_waves):
+
+        print('')
+        print('Parsing waveform %d' % wc)
+
+        offset = wc * wave_len
+
+        wave_data = physio_data[slice(offset, offset+wave_len)]
+
+        data_len = int.from_bytes(wave_data[0:4], byteorder=sys.byteorder)
+        fname_len = int.from_bytes(wave_data[4:8], byteorder=sys.byteorder)
+        fname = wave_data[slice(8, 8+fname_len)]
+
+        print('Data length     : %d' % data_len)
+        print('Filename length : %d' % fname_len)
+        print('Filename        : %s' % fname)
+
+        # Extract waveform log byte data
+        log_bytes = wave_data[slice(1024, 1024+data_len)]
+
+        # Parse waveform log
+        t_puls, s_puls, t_resp, s_resp = parse_log(log_bytes)
+#
+#     # Zero time origin (identical offset for all waveforms) and scale to seconds
+#     t_puls = (t_puls - t_puls[0]) * dt_puls
+#     t_resp = (t_resp - t_resp[0]) * dt_resp
+#
+#     # Resample respiration waveform to match pulse waveform timing
+#     f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
+#     s_resp_i = f(t_puls)
+#
+#     # Create a dataframe from a data dictionary
+#     d = {'Time_s':t_puls, 'Pulse':s_puls, 'Resp': s_resp_i}
+#     df = pd.DataFrame(d)
+#
+#     # Export pulse and respiratory waveforms to TSV file
+#     tsv_fname = os.path.splitext(physio_dcm)[0]+'.tsv'
+#     print('Saving pulse and respiratory waveforms to %s' % tsv_fname)
+#     df.to_csv(tsv_fname,
+#               sep='\t',
+#               columns=['Time_s', 'Pulse', 'Resp'],
+#               index=False,
+#               float_format='%0.3f')
+#
+def parse_log(log_bytes):
+
     # Convert from a bytes literal to a UTF-8 encoded string, ignoring errors
-    physio_string = d[0x7fe1, 0x1010].value.decode('utf-8', 'ignore')
+    physio_string = log_bytes.decode('utf-8', 'ignore')
 
     # CMRR DICOM physio log has \n separated lines
     physio_lines = physio_string.splitlines()
@@ -94,9 +166,7 @@ def main():
                 current_waveform = parts[2]
 
             if 'SampleTime' in parts[0]:
-
-                if 'PULS' in current_waveform:
-                    dt_puls = float(parts[2]) * 1e-3
+                dt_puls = float(parts[2]) * 1e-3
 
                 if 'RESP' in current_waveform:
                     dt_resp = float(parts[2]) * 1e-3
@@ -109,34 +179,10 @@ def main():
                 t_resp.append(float(parts[0]))
                 s_resp.append(float(parts[2]))
 
-    # Convert to numpy arrays
-    t_puls = np.array(t_puls)
-    t_resp = np.array(t_resp)
-    s_puls = np.array(s_puls)
-    s_resp = np.array(s_resp)
-
-    # Zero time origin (identical offset for all waveforms) and scale to seconds
-    t_puls = (t_puls - t_puls[0]) * dt_puls
-    t_resp = (t_resp - t_resp[0]) * dt_resp
-
-    # Resample respiration waveform to match pulse waveform timing
-    f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
-    s_resp_i = f(t_puls)
-
-    # Create a dataframe from a data dictionary
-    d = {'Time_s':t_puls, 'Pulse':s_puls, 'Resp': s_resp_i}
-    df = pd.DataFrame(d)
-
-    # Export pulse and respiratory waveforms to TSV file
-    tsv_fname = os.path.splitext(physio_dcm)[0]+'.tsv'
-    print('Saving pulse and respiratory waveforms to %s' % tsv_fname)
-    df.to_csv(tsv_fname,
-              sep='\t',
-              columns=['Time_s', 'Pulse', 'Resp'],
-              index=False,
-              float_format='%0.3f')
+    return t_puls, s_puls, t_resp, s_resp
 
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
     main()
+
