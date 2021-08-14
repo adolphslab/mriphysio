@@ -147,32 +147,38 @@ def convert_physio(ds, dest_dir, physio_stub, verbose=False):
         if "RESP" in waveform_name:
             t_resp, s_resp, dt_resp = t, s, dt
 
-    # Zero time origin (identical offset for all waveforms) and scale to seconds
-    t_puls = (t_puls - t_puls[0]) * dt_puls
-    t_resp = (t_resp - t_resp[0]) * dt_resp
+    if (len(t_puls) > 0) & (len(t_resp) > 0):
 
-    # Resample respiration waveform to match pulse waveform timing
-    f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
-    s_resp_i = f(t_puls)
+        # Zero time origin (identical offset for all waveforms) and scale to seconds
+        t_puls = (t_puls - t_puls[0]) * dt_puls
+        t_resp = (t_resp - t_resp[0]) * dt_resp
 
-    # Create a two-column numpy array and write to a TSV file
-    out_array = np.array([s_puls, s_resp_i]).T
+        # Resample respiration waveform to match pulse waveform timing
+        f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
+        s_resp_i = f(t_puls)
 
-    tsv_fname = os.path.join(dest_dir, physio_stub + '.tsv')
-    print(f'  Saving pulse and resp waveforms to {tsv_fname}')
-    np.savetxt(tsv_fname, out_array, fmt='%0.3f', delimiter='\t')
+        # Create a two-column numpy array and write to a TSV file
+        out_array = np.array([s_puls, s_resp_i]).T
 
-    # Create a metadata dictionary and write to a JSON file
-    meta_dict = {
-        'SamplingFrequency': 1.0/dt_puls,
-        'StartTime': 0.0,
-        'Columns': ['Pulse', 'Respiration']
-    }
+        tsv_fname = os.path.join(dest_dir, physio_stub + '.tsv')
+        print(f'  Saving pulse and resp waveforms to {tsv_fname}')
+        np.savetxt(tsv_fname, out_array, fmt='%0.3f', delimiter='\t')
 
-    json_fname = os.path.join(dest_dir, physio_stub + '.json')
-    print(f'  Saving waveform metadata to {json_fname}')
-    with open(json_fname, 'w') as fd:
-        json.dump(meta_dict, fd)
+        # Create a metadata dictionary and write to a JSON file
+        meta_dict = {
+            'SamplingFrequency': 1.0 / dt_puls,
+            'StartTime': 0.0,
+            'Columns': ['Pulse', 'Respiration']
+        }
+
+        json_fname = os.path.join(dest_dir, physio_stub + '.json')
+        print(f'  Saving waveform metadata to {json_fname}')
+        with open(json_fname, 'w') as fd:
+            json.dump(meta_dict, fd)
+
+    else:
+
+        print('* Empty pulse or respiration waveform - skipping')
 
 
 def parse_log(log_bytes, verbose=False):
