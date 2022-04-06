@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Purpose
 ----
@@ -86,10 +86,19 @@ def main():
     n_waves = int(n_cols / 1024)
     wave_len = int(n_points / n_waves)
 
+    print('')
+    print(f'Detected {n_points} points in {n_rows} rows and {n_cols} columns')
+    print(f'Detected {n_waves} waveforms')
+
     # Init time and waveform vectors
+    t_ecg1, s_ecg1, dt_ecg1 = [], [], 1.0
+    t_ecg2, s_ecg2, dt_ecg2 = [], [], 1.0
+    t_ecg3, s_ecg3, dt_ecg3 = [], [], 1.0
+    t_ecg4, s_ecg4, dt_ecg4 = [], [], 1.0
     t_puls, s_puls, dt_puls = [], [], 1.0
     t_resp, s_resp, dt_resp = [], [], 1.0
 
+    # Parse each waveform type (ECG, pulse, resp) separately
     for wc in range(n_waves):
 
         print('')
@@ -113,6 +122,12 @@ def main():
         # Parse waveform log
         waveform_name, t, s, dt = parse_log(log_bytes)
 
+        if "ECG" in waveform_name:
+            t_ecg1, s_ecg1, dt_ecg1 = t[0], s[0], dt
+            t_ecg2, s_ecg2, dt_ecg2 = t[1], s[1], dt
+            t_ecg3, s_ecg3, dt_ecg3 = t[2], s[2], dt
+            t_ecg4, s_ecg4, dt_ecg4 = t[3], s[3], dt
+
         if "PULS" in waveform_name:
             t_puls, s_puls, dt_puls = t, s, dt
 
@@ -120,26 +135,36 @@ def main():
             t_resp, s_resp, dt_resp = t, s, dt
 
     # Zero time origin (identical offset for all waveforms) and scale to seconds
+    t_ecg = (t_ecg1 - t_ecg1[0]) * dt_ecg1
     t_puls = (t_puls - t_puls[0]) * dt_puls
     t_resp = (t_resp - t_resp[0]) * dt_resp
 
-    # Resample respiration waveform to match pulse waveform timing
+    print('')
+
+    # Resample pulse waveform to match ECG waveform timing
+    print('Interpolating pulse waveform to ECG sampling')
+    f = interp1d(t_puls, s_puls, kind='cubic', fill_value='extrapolate')
+    s_puls_i = f(t_ecg)
+
+    # Resample respiration waveform to match ECG waveform timing
+    print('Interpolating respiration waveform to ECG sampling')
     f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
-    s_resp_i = f(t_puls)
+    s_resp_i = f(t_ecg)
 
     # Create a dataframe from a data dictionary
-    d = {'Time_s':t_puls, 'Pulse':s_puls, 'Resp': s_resp_i}
+    print('Creating pandas dataframe')
+    d = {'Time_s':t_ecg, 'ECG1':s_ecg1, 'ECG2':s_ecg2, 'ECG3':s_ecg3, 'ECG3':s_ecg4, 'Pulse':s_puls_i, 'Resp': s_resp_i}
     df = pd.DataFrame(d)
 
     # Export pulse and respiratory waveforms to TSV file
-    tsv_fname = os.path.splitext(physio_dcm)[0]+'.tsv'
+    tsv_fname = f"{os.path.splitext(physio_dcm)[0]}.tsv"
 
     print('')
     print('Saving pulse and respiratory waveforms to %s' % tsv_fname)
 
     df.to_csv(tsv_fname,
               sep='\t',
-              columns=['Time_s', 'Pulse', 'Resp'],
+              columns=['Time_s', 'ECG1', 'ECG2', 'ECG3', 'Pulse', 'Resp'],
               index=False,
               float_format='%0.3f')
 
@@ -154,17 +179,19 @@ def parse_log(log_bytes):
 
     # Init parameters and lists
     uuid = "UNKNOWN"
-    waveform_name = "UNKNOWN"
+    data_type = "UNKNOWN"
     scan_date = "UNKNOWN"
-    dt = 1.0
-    t_list, s_list = [], []
+    dt = -1.0
+    t_list = []
+    s_list = []
+    ch_list = []
 
     for line in physio_lines:
 
         # Divide the line at whitespace
         parts = line.split()
 
-        # Data lines have the form "<tag> = <value>" or "<time> <name> <signal>"
+        # Data lines have the form "<tag> = <value>" or "<time> <channel> <signal>"
         if len(parts) == 3:
 
             p1, p2, p3 = parts
@@ -176,21 +203,39 @@ def parse_log(log_bytes):
                 scan_date = p3
 
             if 'LogDataType' in p1:
-                waveform_name = p3
+                data_type = p3
 
             if 'SampleTime' in p1:
                 dt = float(p3) * 1e-3
 
-            if 'PULS' in p2 or 'RESP' in p2:
+            if 'ECG' in p2 or 'PULS' in p2 or 'RESP' in p2:
                 t_list.append(float(p1))
                 s_list.append(float(p3))
+                ch_list.append(p2)
 
-    print('UUID            : %s' % uuid)
-    print('Scan date       : %s' % scan_date)
-    print('Waveform type   : %s' % waveform_name)
+    print(f'UUID            : {uuid}')
+    print(f'Scan date       : {scan_date}')
+    print(f'Data type       : {data_type}')
+
+    # Convert to numpy arrays
+    t, s, ch = np.array(t_list), np.array(s_list), np.array(ch_list)
+
+    if 'ECG' in data_type:
+
+        i1 = ch == 'ECG1'
+        i2 = ch == 'ECG2'
+        i3 = ch == 'ECG3'
+        i4 = ch == 'ECG4'
+
+        t1, s1 = t[i1], s[i1]
+        t2, s2 = t[i2], s[i2]
+        t3, s3 = t[i3], s[i3]
+        t4, s4 = t[i4], s[i4]
+
+        pass
 
     # Return numpy arrays
-    return waveform_name, np.array(t_list), np.array(s_list), dt
+    return data_type, t, s, dt
 
 
 # This is the standard boilerplate that calls the main() function.
