@@ -73,7 +73,7 @@ def main():
     n_points = len(physio_data)
     n_rows = d.AcquisitionNumber
 
-    if (n_points % n_rows):
+    if n_points % n_rows:
         print('* Points (%d) is not an integer multiple of rows (%d) - exiting' % (n_points, n_rows))
         sys.exit(-1)
 
@@ -112,9 +112,9 @@ def main():
         fname_len = int.from_bytes(wave_data[4:8], byteorder=sys.byteorder)
         fname = wave_data[slice(8, 8+fname_len)]
 
-        print('Data length     : %d' % data_len)
-        print('Filename length : %d' % fname_len)
-        print('Filename        : %s' % fname)
+        print(f'Data length     : {data_len}')
+        print(f'Filename length : {fname_len}')
+        print(f'Filename        : {fname}')
 
         # Extract waveform log byte data
         log_bytes = wave_data[slice(1024, 1024+data_len)]
@@ -123,10 +123,8 @@ def main():
         waveform_name, t, s, dt = parse_log(log_bytes)
 
         if "ECG" in waveform_name:
-            t_ecg1, s_ecg1, dt_ecg1 = t[0], s[0], dt
-            t_ecg2, s_ecg2, dt_ecg2 = t[1], s[1], dt
-            t_ecg3, s_ecg3, dt_ecg3 = t[2], s[2], dt
-            t_ecg4, s_ecg4, dt_ecg4 = t[3], s[3], dt
+            t_ecg, dt_ecg = t, dt
+            s_ecg1, s_ecg2, s_ecg3, s_ecg4 = s[:, 0], s[:, 1], s[:, 2], s[:, 3]
 
         if "PULS" in waveform_name:
             t_puls, s_puls, dt_puls = t, s, dt
@@ -135,7 +133,7 @@ def main():
             t_resp, s_resp, dt_resp = t, s, dt
 
     # Zero time origin (identical offset for all waveforms) and scale to seconds
-    t_ecg = (t_ecg1 - t_ecg1[0]) * dt_ecg1
+    t_ecg = (t_ecg - t_ecg[0]) * dt_ecg
     t_puls = (t_puls - t_puls[0]) * dt_puls
     t_resp = (t_resp - t_resp[0]) * dt_resp
 
@@ -153,7 +151,15 @@ def main():
 
     # Create a dataframe from a data dictionary
     print('Creating pandas dataframe')
-    d = {'Time_s':t_ecg, 'ECG1':s_ecg1, 'ECG2':s_ecg2, 'ECG3':s_ecg3, 'ECG3':s_ecg4, 'Pulse':s_puls_i, 'Resp': s_resp_i}
+    d = {
+        'Time_s': t_ecg,
+        'ECG1': s_ecg1,
+        'ECG2': s_ecg2,
+        'ECG3': s_ecg3,
+        'ECG4': s_ecg4,
+        'Pulse': s_puls_i,
+        'Resp': s_resp_i
+    }
     df = pd.DataFrame(d)
 
     # Export pulse and respiratory waveforms to TSV file
@@ -164,7 +170,7 @@ def main():
 
     df.to_csv(tsv_fname,
               sep='\t',
-              columns=['Time_s', 'ECG1', 'ECG2', 'ECG3', 'Pulse', 'Resp'],
+              columns=['Time_s', 'ECG1', 'ECG2', 'ECG3', 'ECG4', 'Pulse', 'Resp'],
               index=False,
               float_format='%0.3f')
 
@@ -222,20 +228,54 @@ def parse_log(log_bytes):
 
     if 'ECG' in data_type:
 
+        # Separate timestamps and signal for each ECG channel (1..4)
         i1 = ch == 'ECG1'
         i2 = ch == 'ECG2'
         i3 = ch == 'ECG3'
         i4 = ch == 'ECG4'
 
+        # In general t1..t4 are different lengths but with same min, max
+        # Assuming some values are dropped. Time vectors have unit spacing
         t1, s1 = t[i1], s[i1]
         t2, s2 = t[i2], s[i2]
         t3, s3 = t[i3], s[i3]
         t4, s4 = t[i4], s[i4]
 
-        pass
+        # Remove duplicate time points (typically only one or two duplicates in a waveform)
+        t1, s1 = remove_duplicates(t1, s1)
+        t2, s2 = remove_duplicates(t2, s2)
+        t3, s3 = remove_duplicates(t3, s3)
+        t4, s4 = remove_duplicates(t4, s4)
+
+        # Find limits over all time vectors
+        t_min = np.min([t1.min(), t2.min(), t3.min(), t4.min()])
+        t_max = np.max([t1.max(), t2.max(), t3.max(), t4.max()])
+
+        # Create new t vector
+        t_i = np.arange(t_min, t_max+1)
+
+        # Interpolate all ECG signals to new t vector
+        f1 = interp1d(t1, s1, kind='cubic', fill_value='extrapolate')
+        s1_i = f1(t_i)
+        f2 = interp1d(t2, s2, kind='cubic', fill_value='extrapolate')
+        s2_i = f2(t_i)
+        f3 = interp1d(t3, s3, kind='cubic', fill_value='extrapolate')
+        s3_i = f3(t_i)
+        f4 = interp1d(t4, s4, kind='cubic', fill_value='extrapolate')
+        s4_i = f4(t_i)
+
+        # Stack channel signals into nt x 4 array
+        t = t_i
+        s = np.column_stack([s1_i, s2_i, s3_i, s4_i])
 
     # Return numpy arrays
     return data_type, t, s, dt
+
+
+def remove_duplicates(t, s):
+    u, c = np.unique(t, return_counts=True)
+    inds = np.where(c > 1)
+    return np.delete(t, inds), np.delete(s, inds)
 
 
 # This is the standard boilerplate that calls the main() function.
