@@ -1,3 +1,7 @@
+"""
+Class for opening and converting a DICOM physiology waveform object (CMRR) to TSV text file
+"""
+
 import os.path as op
 import sys
 import pydicom
@@ -121,40 +125,20 @@ class PhysioDicom:
         print('')
         print('Interpolating waveforms to master clock')
 
+        # Construct dataframe for available interpolated waveforms
+        self._df = pd.DataFrame({'Time_s': t_master})
+
         if have_ecg:
-            s_ecg1_i = self._resample(t_master, t_ecg, s_ecg1)
-            s_ecg2_i = self._resample(t_master, t_ecg, s_ecg2)
-            s_ecg3_i = self._resample(t_master, t_ecg, s_ecg3)
-            s_ecg4_i = self._resample(t_master, t_ecg, s_ecg4)
-        else:
-            s_ecg1_i = []
-            s_ecg2_i = []
-            s_ecg3_i = []
-            s_ecg4_i = []
+            self._df['ECG1'] = self._resample(t_master, t_ecg, s_ecg1)
+            self._df['ECG2'] = self._resample(t_master, t_ecg, s_ecg2)
+            self._df['ECG3'] = self._resample(t_master, t_ecg, s_ecg3)
+            self._df['ECG4'] = self._resample(t_master, t_ecg, s_ecg4)
 
         if have_puls:
-            s_puls_i = self._resample(t_master, t_puls, s_puls)
-        else:
-            s_puls_i = []
+            self._df['Pulse'] = self._resample(t_master, t_puls, s_puls)
 
         if have_resp:
-            s_resp_i = self._resample(t_master, t_resp, s_resp)
-        else:
-            s_resp_i = []
-
-        # Create a dataframe from a data dictionary
-        print('Creating pandas dataframe')
-        d = {
-            'Time_s': t_master,
-            'ECG1': s_ecg1_i,
-            'ECG2': s_ecg2_i,
-            'ECG3': s_ecg3_i,
-            'ECG4': s_ecg4_i,
-            'Pulse': s_puls_i,
-            'Resp': s_resp_i
-        }
-
-        self._df = pd.DataFrame(d)
+            self._df['Resp'] = self._resample(t_master, t_resp, s_resp)
 
     def save(self, physio_tsv):
 
@@ -163,7 +147,6 @@ class PhysioDicom:
 
         self._df.to_csv(physio_tsv,
                   sep='\t',
-                  columns=['Time_s', 'ECG1', 'ECG2', 'ECG3', 'ECG4', 'Pulse', 'Resp'],
                   index=False,
                   float_format='%0.6f')
 

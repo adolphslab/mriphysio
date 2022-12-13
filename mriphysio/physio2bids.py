@@ -41,9 +41,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-__version__ = '2022.12.7'
-
-
 import os
 import argparse
 
@@ -59,7 +56,7 @@ def main():
     args = parser.parse_args()
 
     physio_dcm = args.infile
-    if len(args.infile) > 0:
+    if len(args.outfile) > 0:
         physio_tsv = args.outfile
     else:
         physio_tsv = f"{os.path.splitext(physio_dcm)[0]}.tsv"
