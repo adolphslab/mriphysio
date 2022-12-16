@@ -22,6 +22,7 @@ class PhysioDicom:
         self._df = pd.DataFrame()
 
         # Create DICOM object
+        self._physio_dcm = physio_dcm
         self._dcm = pydicom.dcmread(physio_dcm, stop_before_pixels=True)
 
         # Extract data from Siemens spectroscopy tag (0x7fe1, 0x1010)
@@ -140,7 +141,10 @@ class PhysioDicom:
         if have_resp:
             self._df['Resp'] = self._resample(t_master, t_resp, s_resp)
 
-    def save(self, physio_tsv):
+    def save(self, physio_tsv=None):
+
+        if not physio_tsv:
+            physio_tsv = self._physio_dcm.replace('.dcm', '.tsv')
 
         print('')
         print(f'Saving pulse and respiratory waveforms to {physio_tsv}')
