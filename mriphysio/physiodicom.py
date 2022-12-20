@@ -19,7 +19,12 @@ class PhysioDicom:
         assert op.isfile(physio_dcm), f'* {physio_dcm} does not exist'
 
         # Init waveform dataframe
-        self._df = pd.DataFrame()
+        self.waveforms = pd.DataFrame()
+
+        # Channel flags
+        self.have_ecg = False
+        self.have_resp = False
+        self.have_puls = False
 
         # Create DICOM object
         self._physio_dcm = physio_dcm
@@ -98,25 +103,25 @@ class PhysioDicom:
                 t_resp, s_resp, tick_resp = t, s, tick
 
         # Set availability flag for each waveform
-        have_ecg = len(t_ecg) > 0
-        have_resp = len(t_resp) > 0
-        have_puls = len(t_puls) > 0
+        self.have_ecg = len(t_ecg) > 0
+        self.have_resp = len(t_resp) > 0
+        self.have_puls = len(t_puls) > 0
 
         # Zero time origin (identical offset for all waveforms) and scale to seconds
-        if have_ecg:
+        if self.have_ecg:
             t_ecg = (t_ecg - t_ecg[0]) * tick_ecg * self.dt
-        if have_puls:
+        if self.have_puls:
             t_puls = (t_puls - t_puls[0]) * tick_puls * self.dt
-        if have_resp:
+        if self.have_resp:
             t_resp = (t_resp - t_resp[0]) * tick_resp * self.dt
 
         # Create master clock vector in seconds from highest sampling rate time vector
         # Typically this is the ECG time vector if acquired
-        if have_ecg:
+        if self.have_ecg:
             t_master = t_ecg
-        elif have_puls:
+        elif self.have_puls:
             t_master = t_puls
-        elif have_resp:
+        elif self.have_resp:
             t_master = t_resp
         else:
             print(f'* No waveform time vector found - exiting')
@@ -127,32 +132,34 @@ class PhysioDicom:
         print('Interpolating waveforms to master clock')
 
         # Construct dataframe for available interpolated waveforms
-        self._df = pd.DataFrame({'Time_s': t_master})
+        # Init with master time vector
+        self.waveforms = pd.DataFrame({'Time_s': t_master})
 
-        if have_ecg:
-            self._df['ECG1'] = self._resample(t_master, t_ecg, s_ecg1)
-            self._df['ECG2'] = self._resample(t_master, t_ecg, s_ecg2)
-            self._df['ECG3'] = self._resample(t_master, t_ecg, s_ecg3)
-            self._df['ECG4'] = self._resample(t_master, t_ecg, s_ecg4)
+        if self.have_ecg:
+            self.waveforms['ECG1'] = self._resample(t_master, t_ecg, s_ecg1)
+            self.waveforms['ECG2'] = self._resample(t_master, t_ecg, s_ecg2)
+            self.waveforms['ECG3'] = self._resample(t_master, t_ecg, s_ecg3)
+            self.waveforms['ECG4'] = self._resample(t_master, t_ecg, s_ecg4)
 
-        if have_puls:
-            self._df['Pulse'] = self._resample(t_master, t_puls, s_puls)
+        if self.have_puls:
+            self.waveforms['Pulse'] = self._resample(t_master, t_puls, s_puls)
 
-        if have_resp:
-            self._df['Resp'] = self._resample(t_master, t_resp, s_resp)
+        if self.have_resp:
+            self.waveforms['Resp'] = self._resample(t_master, t_resp, s_resp)
+
+        return self.waveforms
 
     def save(self, physio_tsv=None):
 
         if not physio_tsv:
             physio_tsv = self._physio_dcm.replace('.dcm', '.tsv')
 
-        print('')
-        print(f'Saving pulse and respiratory waveforms to {physio_tsv}')
+        print(f'\nSaving pulse and respiratory waveforms to {physio_tsv}')
 
-        self._df.to_csv(physio_tsv,
-                  sep='\t',
-                  index=False,
-                  float_format='%0.6f')
+        self.waveforms.to_csv(physio_tsv,
+                              sep='\t',
+                              index=False,
+                              float_format='%0.6f')
 
     def _parse_log(self, log_bytes):
 

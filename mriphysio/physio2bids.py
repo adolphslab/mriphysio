@@ -45,6 +45,7 @@ import os
 import argparse
 
 from .physiodicom import PhysioDicom
+from .ecg import HeartRate
 
 
 def main():
@@ -63,8 +64,18 @@ def main():
 
     # Load, convert and save DICOM physio log
     physio = PhysioDicom(physio_dcm)
-    physio.convert()
+    waveforms = physio.convert()
     physio.save(physio_tsv)
+
+    # Optional heart rate output if ECG present
+    if physio.have_ecg:
+
+        # Heart rate BIDS TSV from physio TSV
+        hr_tsv = physio_tsv.replace('.tsv', '_heartrate.tsv')
+
+        heart_rate = HeartRate(waveforms['Time_s'].values, waveforms[['ECG1', 'ECG2', 'ECG3', 'ECG4']].values)
+        heart_rate.estimate()
+        heart_rate.save(hr_tsv)
 
 
 # This is the standard boilerplate that calls the main() function.
