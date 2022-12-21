@@ -33,8 +33,8 @@ class HeartRate:
         self.dt = t[1] - t[0]
         self.fs = 1.0 / self.dt
 
-        # Heart rate estimation window in seconds
-        self._window = 10.0
+        # Spectrogram temporal segment duration (s)
+        self._t_seg = 10.0
 
         # Heart rate and associated time vector
         self.hr = pd.DataFrame()
@@ -59,21 +59,44 @@ class HeartRate:
         # Grab Lead I (actual lead V3)
         ecg1 = self._ecg[:, 0]
 
-        # Construct spectrogram with sufficient frequency resolution (< 0.5Hz)
+        # ECG waveform duration (s)
+        t_ecg = np.max(self._t)
+
+        # Spectrogram temporal segment duration (s)
+        t_seg = 10.0
+
+        if t_ecg < t_seg:
+            raise Exception(f'ECG waveform too short ({t_ecg} s) - need at least {t_seg} s')
+
+        # Number of temporal samples per segment
+        nps = int(self._t_seg / self.dt)
+
+        freq_bw = self.fs / 2.0
+        targ_freq_res = 0.05
+        nfft = int(freq_bw / targ_freq_res * 2.0)
+
+        print(f'ECG waveform dur   : {t_ecg} s')
+        print(f'Sampling frequency : {self.fs} Hz')
+
+        print(f'\nSpectrogram')
+        print(f'-----------')
+        print(f'Temporal samples   : {len(ecg1)}')
+        print(f'Segment length     : {nps}')
+        print(f'Frequency BW       : {freq_bw} Hz')
+        print(f'Target freq res    : {targ_freq_res} Hz')
+        print(f'FFT length         : {nfft}')
+
+        # Construct spectrogram
         f_spec, t_spec, sxx = spectrogram(
             ecg1,
             fs=self.fs,
-            nperseg=int(self._window / self.dt),
-            nfft=8000
+            nperseg=nps,
+            nfft=nfft
         )
 
-        # Spectrogram temporal and frequency resolutions
         dt_spec = t_spec[1] - t_spec[0]
         df_spec = f_spec[1] - f_spec[0]
 
-        print(f'Sampling frequency : {self.fs} Hz')
-        print(f'Temporal samples   : {len(ecg1)}')
-        print(f'Sampling time      : {np.max(t_spec)} s')
         print(f'Temporal bins      : {len(t_spec)}')
         print(f'Temporal res       : {dt_spec} s')
         print(f'Frequency bins     : {len(f_spec)}')
@@ -81,8 +104,8 @@ class HeartRate:
 
         # Crop spectrogram frequencies to capture physiological HR range (0.5 to 3.5 Hz) and
         # RF pulse interference (approx 12.5 Hz)
-        f_max = 20.0
-        mask = f_spec <= f_max
+        f_min, f_max = 0.5, 15.0
+        mask = (f_min <= f_spec) & (f_spec <= f_max)
         f_crop = f_spec[mask]
         sxx_crop = sxx[mask, :]
 
@@ -90,21 +113,25 @@ class HeartRate:
         # Robust identification of cardiac fundamental frequency over time
         p_tmed = np.median(sxx_crop, axis=1)
 
-        # Find peak in temporal median power closest to 1 Hz
-        i_peaks = find_peaks(p_tmed, distance=1.0 / df_spec)
-        f_peaks = f_spec[i_peaks[0]]
-        cardiac_peak = np.argmin(np.abs(f_peaks - 1.0))
+        i_peaks = find_peaks(p_tmed, distance=f_min / df_spec)
+        f_peaks = f_crop[i_peaks[0]]
+        print(f'Frequency peaks    :')
+        print(f'  {f_peaks} Hz')
+
+        # Find peak in temporal median power closest to 75 bpm (1.25 Hz)
+        f0_targ = 1.25
+        cardiac_peak = np.argmin(np.abs(f_peaks - f0_targ))
         f0 = f_peaks[cardiac_peak]
+        print(f'Cardiac cycle peak : {f0:0.3f} Hz')
 
-        # Create a +/- 0.5 Hz band around heart peak
-        f0_low = f0 - 0.5
-        f0_high = f0 + 0.5
+        # Create 75% to 150% frequency band around f0
+        f0_low = f0 * 0.75
+        f0_high = f0 * 1.50
 
-        print(f'Cardiac cycle peak : {f0} Hz')
-        print(f'Cardiac cycle band : {f0_low} to {f0_high} Hz')
+        print(f'Cardiac cycle band : {f0_low:0.3f} to {f0_high:0.3f} Hz')
 
         # Find indices closest to heart band limits
-        interpolator = interp1d(f_spec, np.arange(len(f_spec)), kind='nearest')
+        interpolator = interp1d(f_crop, np.arange(len(f_crop)), kind='nearest')
         i_low, i_high = interpolator([f0_low, f0_high]).astype(int)
 
         # Calculate weighted mean fundamental frequency from spectrogram columns
