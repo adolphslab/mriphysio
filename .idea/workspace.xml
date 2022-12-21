@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="v2022.12.21 Improved robustness of cardiac fundamental frequency detection in spectrogram. Added power frequency spread metric (wSD) output in heartrate TSV for quality control.">
+    <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ecg_resp_heartrate.tsv" beforeDir="false" afterPath="$PROJECT_DIR$/data/ecg_resp_heartrate.tsv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mriphysio/ecg.py" beforeDir="false" afterPath="$PROJECT_DIR$/mriphysio/ecg.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,7 +84,14 @@
       <option name="project" value="LOCAL" />
       <updated>1671649138270</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies.">
+      <created>1671661699240</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1671661699240</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -103,6 +108,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Working version 2022.12.13. Sorted out oversized dcm files in data/" />
     <MESSAGE value="v2022.12.21 Improved robustness of cardiac fundamental frequency detection in spectrogram. Added power frequency spread metric (wSD) output in heartrate TSV for quality control." />
-    <option name="LAST_COMMIT_MESSAGE" value="v2022.12.21 Improved robustness of cardiac fundamental frequency detection in spectrogram. Added power frequency spread metric (wSD) output in heartrate TSV for quality control." />
+    <MESSAGE value="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies." />
+    <option name="LAST_COMMIT_MESSAGE" value="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies." />
   </component>
 </project>
