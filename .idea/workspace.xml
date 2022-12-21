@@ -2,11 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="Working version 2022.12.13. Sorted out oversized dcm files in data/">
-      <change afterPath="$PROJECT_DIR$/mriphysio/ecg.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/mriphysio.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/mriphysio.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mriphysio/physiodicom.py" beforeDir="false" afterPath="$PROJECT_DIR$/mriphysio/physiodicom.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ecg_resp.dcm" beforeDir="false" afterPath="$PROJECT_DIR$/data/ecg_resp.dcm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ecg_resp_heartrate.tsv" beforeDir="false" afterPath="$PROJECT_DIR$/data/ecg_resp_heartrate.tsv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/physio.dcm" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mriphysio/ecg.py" beforeDir="false" afterPath="$PROJECT_DIR$/mriphysio/ecg.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -29,6 +29,7 @@
   </component>
   <component name="ProjectId" id="2IsHrUzkXnYoSCjA3VH1n92amSS" />
   <component name="ProjectLevelVcsManager">
+    <OptionsSetting value="false" id="Update" />
     <ConfirmationsSetting value="2" id="Add" />
   </component>
   <component name="ProjectViewState">
@@ -56,7 +57,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="mriphysio.physio2bids" />
-      <option name="PARAMETERS" value="-i physio.dcm" />
+      <option name="PARAMETERS" value="-i ecg_resp.dcm" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="true" />
