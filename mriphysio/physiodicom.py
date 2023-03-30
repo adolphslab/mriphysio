@@ -1,5 +1,16 @@
 """
 Class for opening and converting a DICOM physiology waveform object (CMRR) to TSV text file
+
+AUTHOR : Mike Tyszka
+PLACE  : Caltech Brain Imaging Center
+
+REFERENCES:
+Original CMRR Matlab log parsing script
+    https://github.com/CMRR-C2P/MB/blob/master/extractCMRRPhysio.m
+David Warren's summary of CMRR Physiolog contents
+    https://david-e-warren.me/blog/physiological-data-from-mri/
+
+LICENSE: MIT Copyright Caltech 2023
 """
 
 import os.path as op
@@ -66,16 +77,14 @@ class PhysioDicom:
         t_ecg, t_puls, t_resp = [], [], []
         s_ecg1, s_ecg2, s_ecg3, s_ecg4 = [], [], [], []
         s_puls, s_resp = [], []
-        tick_ecg, tick_puls, tick_resp = -1.0, -1.0, -1.0
 
-        # Parse each waveform type (ECG, pulse, resp) separately
+        # Parse each waveform type (ECG, pulse, resp, EPI info) separately
         for wc in range(self.n_waves):
 
             print('')
             print(f'Parsing waveform {wc}')
 
             offset = wc * self.wave_len
-
             wave_data = self._physio_data[slice(offset, offset+self.wave_len)]
 
             data_len = int.from_bytes(wave_data[0:4], byteorder=sys.byteorder)
@@ -89,18 +98,25 @@ class PhysioDicom:
             # Extract waveform log byte data
             log_bytes = wave_data[slice(1024, 1024+data_len)]
 
-            # Parse waveform log
-            waveform_name, t, s, tick = self._parse_log(log_bytes)
+            # Convert from a bytes literal to a UTF-8 encoded string, ignoring errors
+            # CMRR DICOM physio log has \n separated lines
+            physio_lines = log_bytes.decode('utf-8', 'ignore').splitlines()
+
+            # Parse waveform log into a list of strings
+            waveform_name, t, s = self._parse_header(physio_lines)
 
             if "ECG" in waveform_name:
-                t_ecg, tick_ecg = t, tick
+                t_ecg, tick_ecg = t
                 s_ecg1, s_ecg2, s_ecg3, s_ecg4 = s[:, 0], s[:, 1], s[:, 2], s[:, 3]
 
             if "PULS" in waveform_name:
-                t_puls, s_puls, tick_puls = t, s, tick
+                t_puls, s_puls = t, s
 
             if "RESP" in waveform_name:
-                t_resp, s_resp, tick_resp = t, s, tick
+                t_resp, s_resp = t, s
+
+            if 'ACQUISITION_INFO' in waveform_name:
+                t_epi, s_epi = t, s
 
         # Set availability flag for each waveform
         self.have_ecg = len(t_ecg) > 0
@@ -108,21 +124,23 @@ class PhysioDicom:
         self.have_puls = len(t_puls) > 0
 
         # Zero time origin (identical offset for all waveforms) and scale to seconds
+        # Note that raw time vectors are in ticks (2.5 ms) and don't need further scaling by the reported
+        # tick interval, just scaling by self.dt (2.5 ms)
         if self.have_ecg:
-            t_ecg = (t_ecg - t_ecg[0]) * tick_ecg * self.dt
+            t_ecg_s = (t_ecg - t_ecg[0]) * self.dt
         if self.have_puls:
-            t_puls = (t_puls - t_puls[0]) * tick_puls * self.dt
+            t_puls_s = (t_puls - t_puls[0]) * self.dt
         if self.have_resp:
-            t_resp = (t_resp - t_resp[0]) * tick_resp * self.dt
+            t_resp_s = (t_resp - t_resp[0]) * self.dt
 
         # Create master clock vector in seconds from highest sampling rate time vector
         # Typically this is the ECG time vector if acquired
         if self.have_ecg:
-            t_master = t_ecg
+            t_master = t_ecg_s
         elif self.have_puls:
-            t_master = t_puls
+            t_master = t_puls_s
         elif self.have_resp:
-            t_master = t_resp
+            t_master = t_resp_s
         else:
             print(f'* No waveform time vector found - exiting')
             sys.exit(1)
@@ -136,16 +154,16 @@ class PhysioDicom:
         self.waveforms = pd.DataFrame({'Time_s': t_master})
 
         if self.have_ecg:
-            self.waveforms['ECG1'] = self._resample(t_master, t_ecg, s_ecg1)
-            self.waveforms['ECG2'] = self._resample(t_master, t_ecg, s_ecg2)
-            self.waveforms['ECG3'] = self._resample(t_master, t_ecg, s_ecg3)
-            self.waveforms['ECG4'] = self._resample(t_master, t_ecg, s_ecg4)
+            self.waveforms['ECG1'] = self._resample(t_master, t_ecg_s, s_ecg1)
+            self.waveforms['ECG2'] = self._resample(t_master, t_ecg_s, s_ecg2)
+            self.waveforms['ECG3'] = self._resample(t_master, t_ecg_s, s_ecg3)
+            self.waveforms['ECG4'] = self._resample(t_master, t_ecg_s, s_ecg4)
 
         if self.have_puls:
-            self.waveforms['Pulse'] = self._resample(t_master, t_puls, s_puls)
+            self.waveforms['Pulse'] = self._resample(t_master, t_puls_s, s_puls)
 
         if self.have_resp:
-            self.waveforms['Resp'] = self._resample(t_master, t_resp, s_resp)
+            self.waveforms['Resp'] = self._resample(t_master, t_resp_s, s_resp)
 
         return self.waveforms
 
@@ -163,17 +181,10 @@ class PhysioDicom:
 
     def _parse_log(self, log_bytes):
 
-        # Convert from a bytes literal to a UTF-8 encoded string, ignoring errors
-        physio_string = log_bytes.decode('utf-8', 'ignore')
-
-        # CMRR DICOM physio log has \n separated lines
-        physio_lines = physio_string.splitlines()
-
         # Init parameters and lists
         uuid = "UNKNOWN"
         data_type = "UNKNOWN"
         scan_date = "UNKNOWN"
-        tick = -1
         t_list = []
         s_list = []
         ch_list = []
@@ -198,7 +209,7 @@ class PhysioDicom:
                     data_type = p3
 
                 if 'SampleTime' in p1:
-                    tick = int(p3)
+                    tick_interval = int(p3)
 
                 if 'ECG' in p2 or 'PULS' in p2 or 'RESP' in p2:
                     t_list.append(float(p1))
@@ -208,11 +219,16 @@ class PhysioDicom:
         print(f'UUID            : {uuid}')
         print(f'Scan date       : {scan_date}')
         print(f'Data type       : {data_type}')
-        print(f'Tick interval   : {tick:d}')
+
+        # Skip EPI info where tick_interval = -1
+        if tick_interval > 0.0:
+            print(f'Tick interval   : {tick_interval:d}')
+            print(f'Sampling rate   : {1.0/(self.dt * tick_interval):0.1f} Hz')
 
         # Convert to numpy arrays
         t, s, ch = np.array(t_list), np.array(s_list), np.array(ch_list)
 
+        # Post process four-channel ECG waveforms
         if 'ECG' in data_type:
 
             # Separate timestamps and signal for each ECG channel (1..4)
@@ -255,7 +271,15 @@ class PhysioDicom:
             t = t_i
             s = np.column_stack([s1_i, s2_i, s3_i, s4_i])
 
-        return data_type, t, s, tick
+        return data_type, t, s
+
+    @staticmethod
+    def _parse_epi_info():
+
+        t = []
+        s = []
+
+        return t, s
 
     @staticmethod
     def _remove_duplicates(t, s):

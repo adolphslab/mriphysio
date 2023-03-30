@@ -3,6 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mriphysio/physiodicom.py" beforeDir="false" afterPath="$PROJECT_DIR$/mriphysio/physiodicom.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,12 +48,12 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="$USER_HOME$/opt/anaconda3/envs/mriphysio/bin/python" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/data" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/sandbox/mrphysio" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="mriphysio.physio2bids" />
-      <option name="PARAMETERS" value="-i ecg_resp.dcm" />
+      <option name="PARAMETERS" value="-i sub-CC0006_ses-20190122_task-bang_bold_PhysioLog.dcm" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="true" />
