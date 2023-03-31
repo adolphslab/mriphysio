@@ -92,7 +92,14 @@
       <option name="project" value="LOCAL" />
       <updated>1671661699240</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies.">
+      <created>1671662407509</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1671662407509</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -111,5 +118,16 @@
     <MESSAGE value="v2022.12.21 Improved robustness of cardiac fundamental frequency detection in spectrogram. Added power frequency spread metric (wSD) output in heartrate TSV for quality control." />
     <MESSAGE value="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies." />
     <option name="LAST_COMMIT_MESSAGE" value="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies." />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/mriphysio/physiodicom.py</url>
+          <line>200</line>
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

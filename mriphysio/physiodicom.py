@@ -32,10 +32,11 @@ class PhysioDicom:
         # Init waveform dataframe
         self.waveforms = pd.DataFrame()
 
-        # Channel flags
+        # Channel presence flags
         self.have_ecg = False
         self.have_resp = False
         self.have_puls = False
+        self.have_acq = False
 
         # Create DICOM object
         self._physio_dcm = physio_dcm
@@ -74,9 +75,9 @@ class PhysioDicom:
     def convert(self):
 
         # Init time and waveform vectors
-        t_ecg, t_puls, t_resp = [], [], []
+        t_ecg, t_puls, t_resp, t_acq = [], [], [], []
         s_ecg1, s_ecg2, s_ecg3, s_ecg4 = [], [], [], []
-        s_puls, s_resp = [], []
+        s_puls, s_resp, s_acq = [], [], []
 
         # Parse each waveform type (ECG, pulse, resp, EPI info) separately
         for wc in range(self.n_waves):
@@ -99,97 +100,149 @@ class PhysioDicom:
             log_bytes = wave_data[slice(1024, 1024+data_len)]
 
             # Convert from a bytes literal to a UTF-8 encoded string, ignoring errors
-            # CMRR DICOM physio log has \n separated lines
+            # CMRR DICOM physio log has \n separated lines - use splitlines() to separate into list
             physio_lines = log_bytes.decode('utf-8', 'ignore').splitlines()
 
-            # Parse waveform log into a list of strings
-            waveform_name, t, s = self._parse_header(physio_lines)
+            # Parse log contents for this waveform
+            # hdr will contain additional keys depending on waveform type
+            hdr, t, s = self._parse_log(physio_lines)
 
-            if "ECG" in waveform_name:
-                t_ecg, tick_ecg = t
+            print(f"Data Type       : {hdr['DataType']}")
+
+            if "ECG" in hdr['DataType']:
+                t_ecg = t
                 s_ecg1, s_ecg2, s_ecg3, s_ecg4 = s[:, 0], s[:, 1], s[:, 2], s[:, 3]
 
-            if "PULS" in waveform_name:
+            if "PULS" in hdr:
                 t_puls, s_puls = t, s
 
-            if "RESP" in waveform_name:
+            if "RESP" in hdr:
                 t_resp, s_resp = t, s
 
-            if 'ACQUISITION_INFO' in waveform_name:
-                t_epi, s_epi = t, s
+            if 'ACQUISITION_INFO' in hdr:
+                t_acq, s_acq = t, s
 
         # Set availability flag for each waveform
         self.have_ecg = len(t_ecg) > 0
         self.have_resp = len(t_resp) > 0
         self.have_puls = len(t_puls) > 0
+        self.have_acq = len(t_acq) > 0
 
-        # Zero time origin (identical offset for all waveforms) and scale to seconds
-        # Note that raw time vectors are in ticks (2.5 ms) and don't need further scaling by the reported
-        # tick interval, just scaling by self.dt (2.5 ms)
-        if self.have_ecg:
-            t_ecg_s = (t_ecg - t_ecg[0]) * self.dt
-        if self.have_puls:
-            t_puls_s = (t_puls - t_puls[0]) * self.dt
-        if self.have_resp:
-            t_resp_s = (t_resp - t_resp[0]) * self.dt
-
-        # Create master clock vector in seconds from highest sampling rate time vector
-        # Typically this is the ECG time vector if acquired
-        if self.have_ecg:
-            t_master = t_ecg_s
-        elif self.have_puls:
-            t_master = t_puls_s
-        elif self.have_resp:
-            t_master = t_resp_s
-        else:
-            print(f'* No waveform time vector found - exiting')
-            sys.exit(1)
-
-        # Resample all waveforms to master clock vector
-        print('')
-        print('Interpolating waveforms to master clock')
-
-        # Construct dataframe for available interpolated waveforms
-        # Init with master time vector
-        self.waveforms = pd.DataFrame({'Time_s': t_master})
-
-        if self.have_ecg:
-            self.waveforms['ECG1'] = self._resample(t_master, t_ecg_s, s_ecg1)
-            self.waveforms['ECG2'] = self._resample(t_master, t_ecg_s, s_ecg2)
-            self.waveforms['ECG3'] = self._resample(t_master, t_ecg_s, s_ecg3)
-            self.waveforms['ECG4'] = self._resample(t_master, t_ecg_s, s_ecg4)
-
-        if self.have_puls:
-            self.waveforms['Pulse'] = self._resample(t_master, t_puls_s, s_puls)
-
-        if self.have_resp:
-            self.waveforms['Resp'] = self._resample(t_master, t_resp_s, s_resp)
+        # # Zero time origin (identical offset for all waveforms) and scale to seconds
+        # # Note that raw time vectors are in ticks (2.5 ms) and don't need further scaling by the reported
+        # # tick interval, just scaling by self.dt (2.5 ms)
+        # if self.have_ecg:
+        #     t_ecg_s = (t_ecg - t_ecg[0]) * self.dt
+        # if self.have_puls:
+        #     t_puls_s = (t_puls - t_puls[0]) * self.dt
+        # if self.have_resp:
+        #     t_resp_s = (t_resp - t_resp[0]) * self.dt
+        #
+        # # Create master clock vector in seconds from highest sampling rate time vector
+        # # Typically this is the ECG time vector if acquired
+        # if self.have_ecg:
+        #     t_master = t_ecg_s
+        # elif self.have_puls:
+        #     t_master = t_puls_s
+        # elif self.have_resp:
+        #     t_master = t_resp_s
+        # else:
+        #     print(f'* No waveform time vector found - exiting')
+        #     sys.exit(1)
+        #
+        # # Resample all waveforms to master clock vector
+        # print('')
+        # print('Interpolating waveforms to master clock')
+        #
+        # # Construct dataframe for available interpolated waveforms
+        # # Init with master time vector
+        # self.waveforms = pd.DataFrame({'Time_s': t_master})
+        #
+        # if self.have_ecg:
+        #     self.waveforms['ECG1'] = self._resample(t_master, t_ecg_s, s_ecg1)
+        #     self.waveforms['ECG2'] = self._resample(t_master, t_ecg_s, s_ecg2)
+        #     self.waveforms['ECG3'] = self._resample(t_master, t_ecg_s, s_ecg3)
+        #     self.waveforms['ECG4'] = self._resample(t_master, t_ecg_s, s_ecg4)
+        #
+        # if self.have_puls:
+        #     self.waveforms['PULS'] = self._resample(t_master, t_puls_s, s_puls)
+        #
+        # if self.have_resp:
+        #     self.waveforms['RESP'] = self._resample(t_master, t_resp_s, s_resp)
+        #
+        # if self.have_acq:
+        #     self.waveforms['ACQ'] = self._resample(t_master, t_acq_s, s_acq_s)
 
         return self.waveforms
 
     def save(self, physio_tsv=None):
 
+        # Create TSV filename if none provided
         if not physio_tsv:
             physio_tsv = self._physio_dcm.replace('.dcm', '.tsv')
 
         print(f'\nSaving pulse and respiratory waveforms to {physio_tsv}')
-
         self.waveforms.to_csv(physio_tsv,
                               sep='\t',
                               index=False,
                               float_format='%0.6f')
 
-    def _parse_log(self, log_bytes):
+    def _parse_log(self, physio_lines):
+
+        # Common header keys for all waveforms
+        hdr = {
+            'UUID': self._parse_line(physio_lines[0])[1],
+            'ScanDate': self._parse_line(physio_lines[1])[1],
+            'LogVersion': self._parse_line(physio_lines[2])[1],
+            'DataType': self._parse_line(physio_lines[3])[1]
+        }
+
+        # Waveform-specific header keys
+        match hdr['DataType']:
+            case 'PULS' | 'RESP' | 'ECG':
+                hdr['SampTimeSecs'] = int(self._parse_line(physio_lines[4])[1]) * self.dt
+                wave_start_line = 8
+            case 'ACQUISITION_INFO':
+                hdr['NumSlices'] = int(self._parse_line(physio_lines[4])[1])
+                hdr['NumVolumes'] = int(self._parse_line(physio_lines[5])[1])
+                hdr['NumEchoes'] = int(self._parse_line(physio_lines[6])[1])
+                wave_start_line = 10
+            case _:
+                pass
+
+        # Parse waveform tic timestamps and signal
+        wave_lines = physio_lines[wave_start_line:]
+
+        t, s = [], []
+
+        return hdr, t, s
+
+    def _parse_line(self, line):
+
+        # Divide the line at whitespace
+        parts = line.split()
+
+        if len(parts) == 3:
+            tag, _, val = parts
+        else:
+            tag, val = 'UNKNOWN', 'UNKNOWN'
+
+        return tag, val
+
+    def _parse_pulsresp(self, waveform):
+        """
+        Waveform parser for PULS and RESP data types
+
+        :param log_bytes:
+        :return:
+        """
 
         # Init parameters and lists
-        uuid = "UNKNOWN"
-        data_type = "UNKNOWN"
-        scan_date = "UNKNOWN"
         t_list = []
         s_list = []
         ch_list = []
 
-        for line in physio_lines:
+        for line in waveform:
 
             # Divide the line at whitespace
             parts = line.split()
@@ -228,53 +281,57 @@ class PhysioDicom:
         # Convert to numpy arrays
         t, s, ch = np.array(t_list), np.array(s_list), np.array(ch_list)
 
-        # Post process four-channel ECG waveforms
-        if 'ECG' in data_type:
-
-            # Separate timestamps and signal for each ECG channel (1..4)
-            i1 = ch == 'ECG1'
-            i2 = ch == 'ECG2'
-            i3 = ch == 'ECG3'
-            i4 = ch == 'ECG4'
-
-            # In general t1..t4 are different lengths but with same min, max
-            # Assuming some values are dropped. Time vectors have unit spacing
-            t1, s1 = t[i1], s[i1]
-            t2, s2 = t[i2], s[i2]
-            t3, s3 = t[i3], s[i3]
-            t4, s4 = t[i4], s[i4]
-
-            # Remove duplicate time points (typically only one or two duplicates in a waveform)
-            t1, s1 = self._remove_duplicates(t1, s1)
-            t2, s2 = self._remove_duplicates(t2, s2)
-            t3, s3 = self._remove_duplicates(t3, s3)
-            t4, s4 = self._remove_duplicates(t4, s4)
-
-            # Find limits over all time vectors
-            t_min = np.min([t1.min(), t2.min(), t3.min(), t4.min()])
-            t_max = np.max([t1.max(), t2.max(), t3.max(), t4.max()])
-
-            # Create new t vector
-            t_i = np.arange(t_min, t_max+1)
-
-            # Interpolate all ECG signals to new t vector
-            f1 = interp1d(t1, s1, kind='cubic', fill_value='extrapolate')
-            s1_i = f1(t_i)
-            f2 = interp1d(t2, s2, kind='cubic', fill_value='extrapolate')
-            s2_i = f2(t_i)
-            f3 = interp1d(t3, s3, kind='cubic', fill_value='extrapolate')
-            s3_i = f3(t_i)
-            f4 = interp1d(t4, s4, kind='cubic', fill_value='extrapolate')
-            s4_i = f4(t_i)
-
-            # Stack channel signals into nt x 4 array
-            t = t_i
-            s = np.column_stack([s1_i, s2_i, s3_i, s4_i])
-
         return data_type, t, s
 
-    @staticmethod
-    def _parse_epi_info():
+    def _parse_ecg(self, waveform):
+
+        # # Post process four-channel ECG waveforms
+        # if 'ECG' in data_type:
+        #     # Separate timestamps and signal for each ECG channel (1..4)
+        #     i1 = ch == 'ECG1'
+        #     i2 = ch == 'ECG2'
+        #     i3 = ch == 'ECG3'
+        #     i4 = ch == 'ECG4'
+        #
+        #     # In general t1..t4 are different lengths but with same min, max
+        #     # Assuming some values are dropped. Time vectors have unit spacing
+        #     t1, s1 = t[i1], s[i1]
+        #     t2, s2 = t[i2], s[i2]
+        #     t3, s3 = t[i3], s[i3]
+        #     t4, s4 = t[i4], s[i4]
+        #
+        #     # Remove duplicate time points (typically only one or two duplicates in a waveform)
+        #     t1, s1 = self._remove_duplicates(t1, s1)
+        #     t2, s2 = self._remove_duplicates(t2, s2)
+        #     t3, s3 = self._remove_duplicates(t3, s3)
+        #     t4, s4 = self._remove_duplicates(t4, s4)
+        #
+        #     # Find limits over all time vectors
+        #     t_min = np.min([t1.min(), t2.min(), t3.min(), t4.min()])
+        #     t_max = np.max([t1.max(), t2.max(), t3.max(), t4.max()])
+        #
+        #     # Create new t vector
+        #     t_i = np.arange(t_min, t_max + 1)
+        #
+        #     # Interpolate all ECG signals to new t vector
+        #     f1 = interp1d(t1, s1, kind='cubic', fill_value='extrapolate')
+        #     s1_i = f1(t_i)
+        #     f2 = interp1d(t2, s2, kind='cubic', fill_value='extrapolate')
+        #     s2_i = f2(t_i)
+        #     f3 = interp1d(t3, s3, kind='cubic', fill_value='extrapolate')
+        #     s3_i = f3(t_i)
+        #     f4 = interp1d(t4, s4, kind='cubic', fill_value='extrapolate')
+        #     s4_i = f4(t_i)
+        #
+        #     # Stack channel signals into nt x 4 array
+        #     t = t_i
+        #     s = np.column_stack([s1_i, s2_i, s3_i, s4_i])
+
+        t, s = [], []
+
+        return t, s
+
+    def _parse_epi_info(self, waveform):
 
         t = []
         s = []
