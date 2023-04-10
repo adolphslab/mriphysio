@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="v2023.4.10 Working version ready for final beta testing at other sites">
-      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
+    <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="v2023.4.10 Working version ready for final beta testing at other sites. Requires python 3.10">
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -112,7 +112,14 @@
       <option name="project" value="LOCAL" />
       <updated>1681138298205</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="v2023.4.10 Working version ready for final beta testing at other sites. Requires python 3.10">
+      <created>1681138746654</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1681138746654</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -132,6 +139,7 @@
     <MESSAGE value="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies." />
     <MESSAGE value="Continue adding support for acquisition waveform timing" />
     <MESSAGE value="v2023.4.10 Working version ready for final beta testing at other sites" />
-    <option name="LAST_COMMIT_MESSAGE" value="v2023.4.10 Working version ready for final beta testing at other sites" />
+    <MESSAGE value="v2023.4.10 Working version ready for final beta testing at other sites. Requires python 3.10" />
+    <option name="LAST_COMMIT_MESSAGE" value="v2023.4.10 Working version ready for final beta testing at other sites. Requires python 3.10" />
   </component>
 </project>
