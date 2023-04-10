@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="Continue adding support for acquisition waveform timing">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/conv_physiologs.py" beforeDir="false" afterPath="$PROJECT_DIR$/conv_physiologs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ecg_resp.tsv" beforeDir="false" afterPath="$PROJECT_DIR$/data/ecg_resp.tsv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ecg_resp_heartrate.tsv" beforeDir="false" afterPath="$PROJECT_DIR$/data/ecg_resp_heartrate.tsv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mriphysio/ecg.py" beforeDir="false" afterPath="$PROJECT_DIR$/mriphysio/ecg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mriphysio/physio2bids.py" beforeDir="false" afterPath="$PROJECT_DIR$/mriphysio/physio2bids.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mriphysio/physiodicom.py" beforeDir="false" afterPath="$PROJECT_DIR$/mriphysio/physiodicom.py" afterDir="false" />
+    <list default="true" id="b58002e4-ee23-4d5f-af4a-528b3658cb18" name="Changes" comment="v2023.4.10 Working version ready for final beta testing at other sites">
       <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -112,7 +105,14 @@
       <option name="project" value="LOCAL" />
       <updated>1680294567778</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="v2023.4.10 Working version ready for final beta testing at other sites">
+      <created>1681138298204</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1681138298205</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -131,6 +131,7 @@
     <MESSAGE value="v2022.12.21 Improved robustness of cardiac fundamental frequency detection in spectrogram. Added power frequency spread metric (wSD) output in heartrate TSV for quality control." />
     <MESSAGE value="v2022.12.21 Improved robustness for short ECG waveforms and non-physiological cardiac fundamental frequencies." />
     <MESSAGE value="Continue adding support for acquisition waveform timing" />
-    <option name="LAST_COMMIT_MESSAGE" value="Continue adding support for acquisition waveform timing" />
+    <MESSAGE value="v2023.4.10 Working version ready for final beta testing at other sites" />
+    <option name="LAST_COMMIT_MESSAGE" value="v2023.4.10 Working version ready for final beta testing at other sites" />
   </component>
 </project>
