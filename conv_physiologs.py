@@ -112,7 +112,7 @@ def convert_physio(ds, dest_dir, physio_stub, verbose=False):
     n_waves = int(n_cols / 1024)
     wave_len = int(n_points / n_waves)
 
-    # Init time and waveform vectors
+    # Init time and wave_lines vectors
     t_puls, s_puls, dt_puls = [], [], 1.0
     t_resp, s_resp, dt_resp = [], [], 1.0
 
@@ -120,7 +120,7 @@ def convert_physio(ds, dest_dir, physio_stub, verbose=False):
 
         if verbose:
             print('')
-            print('Parsing waveform %d' % wc)
+            print('Parsing wave_lines %d' % wc)
 
         offset = wc * wave_len
 
@@ -135,10 +135,10 @@ def convert_physio(ds, dest_dir, physio_stub, verbose=False):
             print('Filename length : %d' % fname_len)
             print('Data length     : %d' % data_len)
 
-        # Extract waveform log byte data
+        # Extract wave_lines log byte data
         log_bytes = wave_data[slice(1024, 1024+data_len)]
 
-        # Parse waveform log
+        # Parse wave_lines log
         waveform_name, t, s, dt = parse_log(log_bytes)
 
         if "PULS" in waveform_name:
@@ -153,7 +153,7 @@ def convert_physio(ds, dest_dir, physio_stub, verbose=False):
         t_puls = (t_puls - t_puls[0]) * dt_puls
         t_resp = (t_resp - t_resp[0]) * dt_resp
 
-        # Resample respiration waveform to match pulse waveform timing
+        # Resample respiration wave_lines to match pulse wave_lines timing
         f = interp1d(t_resp, s_resp, kind='cubic', fill_value='extrapolate')
         s_resp_i = f(t_puls)
 
@@ -172,13 +172,13 @@ def convert_physio(ds, dest_dir, physio_stub, verbose=False):
         }
 
         json_fname = os.path.join(dest_dir, physio_stub + '.json')
-        print(f'  Saving waveform metadata to {json_fname}')
+        print(f'  Saving wave_lines metadata to {json_fname}')
         with open(json_fname, 'w') as fd:
             json.dump(meta_dict, fd)
 
     else:
 
-        print('* Empty pulse or respiration waveform - skipping')
+        print('* Empty pulse or respiration wave_lines - skipping')
 
 
 def parse_log(log_bytes, verbose=False):

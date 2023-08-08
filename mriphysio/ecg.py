@@ -1,5 +1,5 @@
 """
-Class for opening and converting a DICOM physiology waveform object (CMRR) to TSV text file
+Class for opening and converting a DICOM physiology wave_lines object (CMRR) to TSV text file
 """
 
 import numpy as np

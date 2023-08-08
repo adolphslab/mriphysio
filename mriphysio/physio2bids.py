@@ -65,7 +65,13 @@ def main():
     # Load, convert and save DICOM physio log
     physio = PhysioDicom(physio_dcm)
     waveforms = physio.convert()
+
+    # Save TSV file of all waveforms
     physio.save(physio_tsv)
+
+    # Save plot of first few seconds of all waveforms to a PNG image
+    preview_png = physio_tsv.replace('.tsv', '_preview.png')
+    physio.save_preview(preview_png)
 
     # Optional heart rate output if ECG present
     if physio.have_ecg:
