@@ -1,6 +1,5 @@
-setuptools~=65.5.1
-numpy~=1.23.5
-pandas~=1.5.2
-pydicom~=2.3.1
-neurokit2~=0.2.2
-scipy~=1.9.3
+setuptools==68.0.0
+numpy==1.25.2
+pandas==2.0.3
+pydicom==2.4.2
+scipy==1.11.1
