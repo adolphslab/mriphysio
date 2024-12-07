@@ -1,189 +1,169 @@
 """
-Class for opening and converting a DICOM physiology wave_lines object (CMRR) to TSV text file
+Class for estimating the respiratory waveform from the phase channel of an EPI timeseries
+- Developed specifically for the Dense Amygdala project, but more widely useful for complex-valued fMRI
+- Required temporally unwrapped complex phase difference BOLD timeseries with critical or better temporal sampling of respiration
+- Do NOT use Laplacian phase unwrapping which removes most of the respiration phase modulation
+
+AUTHOR : Mike Tyszka
+PLACE  : Caltech Brain Imaging Center
+DATES  : 2024-12-05 JMT Build from ideas in Calhoun complex phase fMRI
 """
 
+import json
+import os.path as op
 import numpy as np
 import pandas as pd
+import nibabel as nib
 from scipy.signal import spectrogram, find_peaks
 from scipy.interpolate import interp1d
+from sklearn.decomposition import PCA
 
-# import matplotlib.pyplot as plt
 
+class PhaseRespWave:
 
-class HeartRate:
-
-    def __init__(self, t, ecg):
+    def __init__(self, dphi_pname, wmask_pname, n_pca=1):
         """
 
-        :param t: array, float
-            Waveform time vector in seconds
-        :param ecg: array, float
-            nt x (1 .. 4) of ECG lead waveforms
-        :param tsv_fname, str, path-like
-            Output BIDS heartrate TSV filename
+        :param dphi_pname: str, Pathlike
+            Path to the temporally unwrapped complex phase difference 3D x time Nifti image
+        :param wmask_pname: str, Pathlike
+            Path to weighting mask Nifti image. Contains floats [0, 1]
+        :param n_pca: int, optional
+            Number of PCA components to retain [1]
         """
 
-        self._t = t
-        self._ecg = ecg
-        self._nt = len(t)
-        self._nt_ecg = ecg.shape[0]
-        self._n_leads = ecg.shape[1]
+        # Load the 4D phase difference image
+        self.dphi_nii = nib.load(dphi_pname)
+        self.dphi = self.dphi_nii.get_fdata()
 
-        # Dwell time and sampling frequency (Hz)
-        self.dt = t[1] - t[0]
-        self.fs = 1.0 / self.dt
+        # Create a time vector from the TR and number of timepoints
+        self.tr_s = self.dphi_nii.header['pixdim'][4]
+        self.nt = self.dphi.shape[3]
 
-        # Spectrogram temporal segment duration (s)
-        self._t_seg = 10.0
+        # Time vector for mid-TR of each volume
+        self.t_s = (np.arange(0, self.nt) + 0.5) * self.tr_s
 
-        # Heart rate and associated time vector
-        self.hr = pd.DataFrame()
+        # Load the 3D probabilistic computation mask
+        self.wmask_nii = nib.load(wmask_pname)
+        self.w = self.wmask_nii.get_fdata()
 
-        if not self._nt_ecg == self._nt:
-            raise Exception(f'ECG waveforms and time vector sample mismatch ({self._nt_ecg} vs {self._nt})')
+        # Clamp weights to [0, 1]
+        self.w = np.clip(self.w, 0, 1)
+
+        # PCA components to retain
+        self.n_pca = 1
 
     def estimate(self):
         """
-        Heart rate estimation from CMRR Physiolog ECG
-        - R-wave timing difficult to estimate from magnetohemodynamic contaminated ECG waveforms
-        - Moving FFT (spectrogram) analysis with peak tracking in typical HR frequency range
-
-        AUTHOR : Mike Tyszka
-        PLACE  : Caltech Brain Imaging Center
-        DATES  : 2022-12-20 JMT Build on mriphysio package
+        Respiratory waveform estimation from phase difference 3D x time image
         """
 
-        print('\nHeart Rate Estimation')
-        print('---------------------')
+        print('\nRespiration Waveform Reconstruction')
+        print('-------------------------------------')
 
-        # Grab Lead I (actual lead V3)
-        ecg1 = self._ecg[:, 0]
+        # Flatten the spatial dimensions and transpose to create temporal-spatial data matrix X
+        # X is Nt x Nvox
+        X = self.dphi.reshape(-1, self.dphi.shape[3]).T
 
-        # ECG waveform duration (s)
-        t_ecg = np.max(self._t)
+        # Weighted temporal PCA of signal
+        # Returns temporal components and spatial weights
+        temporal_components, spatial_weights, _ = self.weighted_pca(X, self.w.flatten(), self.n_pca)
 
-        # Spectrogram temporal segment duration (s)
-        t_seg = 10.0
+        # Retain first component as respiration waveform
+        respwave = np.zeros([self.nt, 1+self.n_pca])
+        respwave[:, 0] = self.t_s
+        respwave[:, 1:] = temporal_components
 
-        if t_ecg < t_seg:
-            raise Exception(f'ECG waveform too short ({t_ecg} s) - need at least {t_seg} s')
+        # Construct respiration waveform dataframe
+        resp_headers = [f'Resp{pc+1}' for pc in range(self.n_pca)]
+        self.resp_df = pd.DataFrame(respwave, columns=['Time (s)'] + resp_headers)
 
-        # Number of temporal samples per segment
-        nps = int(self._t_seg / self.dt)
+        return self.resp_df
+        
+    @staticmethod
+    def weighted_pca(X, w, n_pca=1):
+        """
+        Weighted PCA of temporal (Nt rows) x spatial (Nvox columns) data matrix X
+        - spatial weights are applied to each column of X
+        
+        :param X: np.ndarray, shape (Nt, Nvox)
+            Temporal spatial data matrix
+        :param w: np.ndarray, shape (Nvox,)
+            Voxel Weights for each column of X
+        :param n_pca: int, optional (default = 1)
+            Number of PCA components to retain
 
-        freq_bw = self.fs / 2.0
-        targ_freq_res = 0.05
-        nfft = int(freq_bw / targ_freq_res * 2.0)
+        """
 
-        print(f'ECG waveform dur   : {t_ecg} s')
-        print(f'Sampling frequency : {self.fs} Hz')
+        # Step 1: Apply spatial weights
+        Xw = X * w  # Broadcasting
 
-        print(f'\nSpectrogram')
-        print(f'-----------')
-        print(f'Temporal samples   : {len(ecg1)}')
-        print(f'Segment length     : {nps}')
-        print(f'Frequency BW       : {freq_bw} Hz')
-        print(f'Target freq res    : {targ_freq_res} Hz')
-        print(f'FFT length         : {nfft}')
+        # Step 2: Standardize the data (optional, depending on your needs)
+        mean = np.mean(Xw, axis=0)
+        sd = np.std(Xw, axis=0)
+        Xstd = np.zeros_like(Xw)
+        nonzero = sd > 0.0
+        Xstd[:, nonzero] = (Xw[:, nonzero] - mean[nonzero]) / sd[nonzero]
 
-        # Construct spectrogram
-        f_spec, t_spec, sxx = spectrogram(
-            ecg1,
-            fs=self.fs,
-            nperseg=nps,
-            nfft=nfft
-        )
+        # Step 3: Perform PCA
+        pca = PCA(n_components=n_pca)
+        pca.fit(Xstd)
 
-        dt_spec = t_spec[1] - t_spec[0]
-        df_spec = f_spec[1] - f_spec[0]
+        # Report key PCA results
+        print(f'  PCA singular values  : {pca.singular_values_}')
+        print(f'  PCA exp var ratio    : {pca.explained_variance_ratio_}')
+        
+        # Step 4: Retrieve results
+        temporal_components = pca.transform(Xstd)  # Principal components
+        spatial_patterns = pca.components_  # Eigenvectors for spatial patterns
+        
+        return temporal_components, spatial_patterns, pca
 
-        print(f'Temporal bins      : {len(t_spec)}')
-        print(f'Temporal res       : {dt_spec} s')
-        print(f'Frequency bins     : {len(f_spec)}')
-        print(f'Frequency res      : {df_spec} Hz')
+    def to_bids(self, out_dir, bids_stub):
 
-        # Crop spectrogram frequencies to capture physiological HR range (0.5 to 3.5 Hz) and
-        # RF pulse interference (approx 12.5 Hz)
-        f_min, f_max = 0.5, 15.0
-        mask = (f_min <= f_spec) & (f_spec <= f_max)
-        f_crop = f_spec[mask]
-        sxx_crop = sxx[mask, :]
+        # Sampling frequency from TR
+        samp_freq = 1.0 / self.tr_s
 
-        # Temporal median spectral power
-        # Robust identification of cardiac fundamental frequency over time
-        p_tmed = np.median(sxx_crop, axis=1)
+        # Output physio TSV and JSON filenames
+        tsv_fname = op.join(out_dir, f'{bids_stub}.tsv')
+        json_fname = op.join(out_dir, f'{bids_stub}.json')
 
-        i_peaks = find_peaks(p_tmed, distance=f_min / df_spec)
-        f_peaks = f_crop[i_peaks[0]]
-        print(f'Frequency peaks    :')
-        print(f'  {f_peaks} Hz')
-
-        # Find peak in temporal median power closest to 75 bpm (1.25 Hz)
-        f0_targ = 1.25
-        cardiac_peak = np.argmin(np.abs(f_peaks - f0_targ))
-        f0 = f_peaks[cardiac_peak]
-        print(f'Cardiac cycle peak : {f0:0.3f} Hz')
-
-        # Create 75% to 150% frequency band around f0
-        f0_low = f0 * 0.75
-        f0_high = f0 * 1.50
-
-        print(f'Cardiac cycle band : {f0_low:0.3f} to {f0_high:0.3f} Hz')
-
-        # Find indices closest to heart band limits
-        interpolator = interp1d(f_crop, np.arange(len(f_crop)), kind='nearest')
-        i_low, i_high = interpolator([f0_low, f0_high]).astype(int)
-
-        # Calculate weighted mean fundamental frequency from spectrogram columns
-
-        # Carve out fundamental band in spectrogram
-        sxx_f0 = sxx_crop[i_low:i_high, :]
-        f_f0 = f_crop[i_low:i_high]
-
-        # Fundamental frequency from power-weighted mean frequency
-        f0 = np.matmul(sxx_f0.transpose(), f_f0) / np.sum(sxx_f0, axis=0)
-
-        # fig, axs = plt.subplots(1, 1, figsize=(16, 8))
-        # axs.pcolormesh(t_spec, f_crop, np.log(sxx_crop))
-        # axs.set_ylabel('Frequency [Hz]')
-        # axs.set_xlabel('Time [sec]')
-        # axs.plot(t_spec, f0, 'white', linewidth=2)
-        # axs.set_ylim(0, 5)
-        # plt.show()
-
-        # ECG waveform quality control
-        # Calculate weighted sd of frequency in cardiac fundamental band.
-        print('\nRunning quality control on ECG waveform')
-
-        # Sum over frequency of fundamental band spectrogram
-        # Use for weight normalization
-        sxx_f0_fsum = np.sum(sxx_f0, axis=0)
-
-        # Power-weighted SD over frequency
-        wsd = np.zeros_like(t_spec)
-        for tc, tt in enumerate(t_spec):
-            wsd[tc] = np.sqrt(np.sum(sxx_f0[:, tc] * (f_f0 - f0[tc]) ** 2) / sxx_f0_fsum[tc])
-
-        # Weighted SDs > 0.15 Hz generally indicate poor ECG quality in that time bin
-        qc_pass = wsd < 0.15
-        print(f'Quality control pass rate : {np.sum(qc_pass) / len(qc_pass) * 100.0:0.1f} %')
-
-        # Construct heart rate dataframe
-        hr_array = np.vstack([t_spec, f0, wsd]).transpose()
-        self.hr = pd.DataFrame(hr_array, columns=['Time (s)', 'Heart Rate (Hz)', 'wSD (Hz)'])
-
-        return self.hr
-
-    def save(self, hr_tsv):
-
-        print(f'\nSaving estimated heart rate to {hr_tsv}')
-
-        self.hr.to_csv(
-            hr_tsv,
+        # Save respiration waveform to BIDS physio TSV
+        print(f'Saving respiratory waveform to {tsv_fname}')
+        self.resp_df.to_csv(
+            tsv_fname,
             sep='\t',
             index=False,
             float_format='%0.6f'
         )
 
+        # Create dictionary of metadata and write to JSON sidecar
+        json_dict = {
+            "SamplingFrequency": samp_freq,
+            "StartTime": self.resp_df['Time (s)'].min(),
+            "Columns": self.resp_df.columns.tolist(),
+            "Time": {
+                "Units": "s"
+            }
+        }
+
+        # Finally write JSON sidecar
+        print(f'Saving JSON sidecar to {json_fname}')
+        self._write_json(json_fname, json_dict, overwrite=True)
+
+    @staticmethod
+    def _write_json(json_fname, json_dict, overwrite=False):
+
+        if op.isfile(json_fname):
+            if overwrite:
+                create_file = True
+            else:
+                create_file = False
+        else:
+            create_file = True
+
+        if create_file:
+            with open(json_fname, 'w') as fd:
+                json.dump(json_dict, fd, indent=4, separators=(',', ':'))
 
 

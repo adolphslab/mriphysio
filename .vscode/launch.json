@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "Launch epi2resp",
+            "program": "${workspaceFolder}/mriphysio/epi2resp.py",
+            "args": [
+                "-p", "dphi.nii.gz",
+                "-m", "wmask.nii.gz",
+                "-n", "1",
+                "-o", "resp.tsv"
+            ],
+            "cwd": "/Users/jmt/sandbox/epi2resp",
+        }
+    ],
+}

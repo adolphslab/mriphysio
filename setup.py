@@ -45,7 +45,7 @@ setup(
     # For a discussion on single-sourcing the version across setup.py and the
     # project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='2024.7.23',  # Required
+    version='2024.12.6',  # Required
 
     # This is a one-line description or tagline of what your project does. This
     # corresponds to the "Summary" metadata field:
@@ -181,7 +181,8 @@ setup(
     # executes the function `main` from this package when invoked:
     entry_points={  # Optional
         'console_scripts': [
-            'physio2bids=mriphysio.physio2bids:main'
+            'physio2bids=mriphysio.physio2bids:main',
+            'epi2resp=mriphysio.epi2resp:main'
         ],
     },
 

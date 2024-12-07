@@ -1,5 +1,8 @@
 # mriphysio
-MRI physiological DICOM and MPCU log handling functions
+Utility classes and functions for handling the following:
+- Siemens/CMRR MRI physiological DICOM
+- Siemens MPCU logs
+- Respiration waveform reconstruction from EPI phase timeseries
 
 ## VE11C CMRR Multiband DICOM Physiological Logs
 R016a of the Prisma version of CMRR multiband EPI sequences supports output of physiological logging as a DICOM file.
