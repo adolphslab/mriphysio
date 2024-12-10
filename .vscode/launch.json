@@ -7,8 +7,8 @@
             "program": "${workspaceFolder}/mriphysio/epi2resp.py",
             "args": [
                 "-p", "dphi.nii.gz",
-                "-m", "wmask.nii.gz",
-                "-n", "1",
+                "-w", "wmask.nii.gz",
+                "-m", "weighted_mean",
                 "-o", "resp.tsv"
             ],
             "cwd": "/Users/jmt/sandbox/epi2resp",

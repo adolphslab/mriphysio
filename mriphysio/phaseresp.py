@@ -14,20 +14,21 @@ import os.path as op
 import numpy as np
 import pandas as pd
 import nibabel as nib
-from scipy.signal import spectrogram, find_peaks
-from scipy.interpolate import interp1d
+import scipy as sp
 from sklearn.decomposition import PCA
 
 
 class PhaseRespWave:
 
-    def __init__(self, dphi_pname, wmask_pname, n_pca=1):
+    def __init__(self, dphi_pname, wmask_pname, method='weighted_mean', n_pca=1):
         """
 
         :param dphi_pname: str, Pathlike
             Path to the temporally unwrapped complex phase difference 3D x time Nifti image
         :param wmask_pname: str, Pathlike
             Path to weighting mask Nifti image. Contains floats [0, 1]
+        :param method: str, optional
+            Method for respiration waveform estimation ['weighted_mean' or 'pca']
         :param n_pca: int, optional
             Number of PCA components to retain [1]
         """
@@ -51,7 +52,10 @@ class PhaseRespWave:
         self.w = np.clip(self.w, 0, 1)
 
         # PCA components to retain
-        self.n_pca = 1
+        self.n_pca = n_pca
+
+        assert method in ['weighted_mean', 'pca'], f'Unknown method {method}'
+        self.method = method
 
     def estimate(self):
         """
@@ -60,23 +64,73 @@ class PhaseRespWave:
 
         print('\nRespiration Waveform Reconstruction')
         print('-------------------------------------')
+        print(f'  Method: {self.method}')
+        if self.method == 'pca':
+            print(f'  Number of PCA components: {self.n_pca}')
+        print(f'  TR: {self.tr_s:.3f} s')
+        print(f'  Number of timepoints: {self.nt}')
+        print(f'  Voxel dimensions: {self.dphi.shape[0:3]}')
 
         # Flatten the spatial dimensions and transpose to create temporal-spatial data matrix X
         # X is Nt x Nvox
         X = self.dphi.reshape(-1, self.dphi.shape[3]).T
 
-        # Weighted temporal PCA of signal
-        # Returns temporal components and spatial weights
-        temporal_components, spatial_weights, _ = self.weighted_pca(X, self.w.flatten(), self.n_pca)
+        match self.method:
 
-        # Retain first component as respiration waveform
-        respwave = np.zeros([self.nt, 1+self.n_pca])
-        respwave[:, 0] = self.t_s
-        respwave[:, 1:] = temporal_components
+            case 'weighted_mean':
+                # Weighted mean of signal
+                # Calculate the mask weighted spatial mean phase difference for all volumes
+                mean_dphi = np.average(X, axis=1, weights=self.w.flatten())
 
-        # Construct respiration waveform dataframe
-        resp_headers = [f'Resp{pc+1}' for pc in range(self.n_pca)]
-        self.resp_df = pd.DataFrame(respwave, columns=['Time (s)'] + resp_headers)
+                # High pass filter by subtracting savgol baseline
+                # For similarity to typical first PCA component
+                k = int(10.0 / self.tr_s)
+                bline = sp.signal.savgol_filter(mean_dphi, window_length=k, polyorder=3)
+                mean_dphi_hpf = mean_dphi - bline
+
+                respwave = np.zeros([self.nt, 2])
+                respwave_dict = {
+                    'Time (s)': self.t_s,
+                    'Resp': mean_dphi_hpf,
+                }
+                self.resp_df = pd.DataFrame(respwave_dict)
+
+                # Add peak inhalation/exhalation labels
+                self.resp_peaks()
+
+            case 'pca':
+                # Weighted temporal PCA of signal
+                # Returns temporal components and spatial weights
+                temporal_components, spatial_weights, _ = self.weighted_pca(X, self.w.flatten(), self.n_pca)
+
+                # Retain first component as respiration waveform
+                respwave = np.zeros([self.nt, 1+self.n_pca])
+                respwave[:, 0] = self.t_s
+                respwave[:, 1:] = temporal_components
+
+                # Construct respiration waveform dataframe
+                resp_headers = [f'Resp{pc+1}' for pc in range(self.n_pca)]
+                self.resp_df = pd.DataFrame(respwave, columns=['Time (s)'] + resp_headers)
+
+                # Add peak inhalation/exhalation labels
+                self.resp_peaks()
+
+        return self.resp_df
+    
+    def resp_peaks(self):
+        """
+        Find peak inhalation and exhalation in the respiration waveform
+        """
+
+        # Find positive peaks in respiration waveform
+        min_period = 1.0 / self.tr_s
+        pos_peaks, _ = sp.signal.find_peaks(self.resp_df['Resp'], distance=min_period)
+        neg_peaks, _ = sp.signal.find_peaks(-self.resp_df['Resp'], distance=min_period)
+
+        # Add peak locations to respiration waveform dataframe
+        self.resp_df['Peak'] = ''
+        self.resp_df.loc[pos_peaks, 'Peak'] = 'Inhalation'
+        self.resp_df.loc[neg_peaks, 'Peak'] = 'Exhalation'
 
         return self.resp_df
         

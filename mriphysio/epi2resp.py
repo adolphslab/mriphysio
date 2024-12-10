@@ -44,8 +44,9 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Estimate respiratory waveform from complex EPI and save as BIDS-compliant TSV')
-    parser.add_argument('-p', '--phasefile', required=True, help='Nifti 3D x time phase difference timeseries')
-    parser.add_argument('-m', '--maskfile', required=True, help='Nifti weighting mask image')
+    parser.add_argument('-p', '--phasediff', required=True, help='Nifti 3D x time phase difference timeseries')
+    parser.add_argument('-w', '--weightmask', required=True, help='Nifti weighting mask image')
+    parser.add_argument('-m', '--method', default='weighted_mean', help='Spatially weighted mean method')
     parser.add_argument('-n', '--npca', default=1, type=int, help='Numer of PCA components to retain')  
     parser.add_argument('-o', '--outfile', required=True, help='BIDS format repiratory waveform TSV')
     args = parser.parse_args()
@@ -55,7 +56,7 @@ def main():
     bids_stub = op.splitext(op.basename(resp_tsv))[0]
 
     # Estimate the respiratory waveform
-    resp_obj = PhaseRespWave(args.phasefile, args.maskfile, args.npca)
+    resp_obj = PhaseRespWave(args.phasediff, args.weightmask, args.method, args.npca)
     resp_obj.estimate()
     resp_obj.to_bids(out_dir, bids_stub)
 
