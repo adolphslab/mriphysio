@@ -11,12 +11,15 @@ import os
 import os.path as op
 
 
-def save_bids_physio(out_dir, bids_stub, physio_df):
+def save_bids_physio(bids_outdir, bids_stub, physio_df):
     """
 
-    :param out_dir:
-    :param bids_stub:
-    :param physio_df:
+    :param bids_outdir: str, Path-like
+        Directory where BIDS files will be written
+    :param bids_stub: str
+        BIDS-compatible stub for filename, including recording-[TYPE]_physio suffix
+    :param physio_df: pandas DataFrame
+        Physiological recording data including Time column
     :return:
     """
 
@@ -41,8 +44,8 @@ def save_bids_physio(out_dir, bids_stub, physio_df):
     """
 
     # Output physio TSV and JSON filenames
-    tsv_fname = op.join(out_dir, f'{bids_stub}.tsv')
-    json_fname = op.join(out_dir, f'{bids_stub}.json')
+    tsv_fname = op.join(bids_outdir, f'{bids_stub}.tsv')
+    json_fname = op.join(bids_outdir, f'{bids_stub}.json')
 
     # Save respiration waveform to BIDS physio TSV
     # Compressed TSV physio files should NOT have header row
