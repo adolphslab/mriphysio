@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import spectrogram, find_peaks
 from scipy.interpolate import interp1d
-
+from .bidsphysio import save_bids_physio
 # import matplotlib.pyplot as plt
 
 
@@ -37,7 +37,7 @@ class HeartRate:
         self._t_seg = 10.0
 
         # Heart rate and associated time vector
-        self.hr = pd.DataFrame()
+        self.physio_df = pd.DataFrame()
 
         if not self._nt_ecg == self._nt:
             raise Exception(f'ECG waveforms and time vector sample mismatch ({self._nt_ecg} vs {self._nt})')
@@ -170,20 +170,13 @@ class HeartRate:
 
         # Construct heart rate dataframe
         hr_array = np.vstack([t_spec, f0, wsd]).transpose()
-        self.hr = pd.DataFrame(hr_array, columns=['Time (s)', 'Heart Rate (Hz)', 'wSD (Hz)'])
+        self.physio_df = pd.DataFrame(hr_array, columns=['Time', 'HeartRateHz', 'FreqSDHz'])
 
-        return self.hr
+        return self.physio_df
 
-    def save(self, hr_tsv):
+    def to_bids(self, bids_outdir, bids_stub):
 
-        print(f'\nSaving estimated heart rate to {hr_tsv}')
-
-        self.hr.to_csv(
-            hr_tsv,
-            sep='\t',
-            index=False,
-            float_format='%0.6f'
-        )
+        save_bids_physio(bids_outdir, bids_stub, self.physio_df)
 
 
 

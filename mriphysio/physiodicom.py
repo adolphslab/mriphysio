@@ -18,8 +18,9 @@ import sys
 import pydicom
 import numpy as np
 import pandas as pd
-from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+from .bidsphysio import save_bids_physio
 
 
 class PhysioDicom:
@@ -31,7 +32,7 @@ class PhysioDicom:
         assert op.isfile(physio_dcm), f'* {physio_dcm} does not exist'
 
         # Init wave_lines dataframe
-        self.waveforms = pd.DataFrame()
+        self.physio_df = pd.DataFrame()
 
         # Channel presence flags
         self.have_ecg = False
@@ -161,36 +162,28 @@ class PhysioDicom:
 
         # Construct dataframe for available interpolated waveforms
         # Init with master time vector
-        self.waveforms = pd.DataFrame({'Time_s': t_master})
+        self.physio_df = pd.DataFrame({'Time': t_master})
 
         if self.have_ecg:
-            self.waveforms['ECG1'] = self._resample(t_master, t_ecg_s, s_ecg1)
-            self.waveforms['ECG2'] = self._resample(t_master, t_ecg_s, s_ecg2)
-            self.waveforms['ECG3'] = self._resample(t_master, t_ecg_s, s_ecg3)
-            self.waveforms['ECG4'] = self._resample(t_master, t_ecg_s, s_ecg4)
+            self.physio_df['ECG1'] = self._resample(t_master, t_ecg_s, s_ecg1)
+            self.physio_df['ECG2'] = self._resample(t_master, t_ecg_s, s_ecg2)
+            self.physio_df['ECG3'] = self._resample(t_master, t_ecg_s, s_ecg3)
+            self.physio_df['ECG4'] = self._resample(t_master, t_ecg_s, s_ecg4)
 
         if self.have_puls:
-            self.waveforms['PULS'] = self._resample(t_master, t_puls_s, s_puls)
+            self.physio_df['PULS'] = self._resample(t_master, t_puls_s, s_puls)
 
         if self.have_resp:
-            self.waveforms['RESP'] = self._resample(t_master, t_resp_s, s_resp)
+            self.physio_df['RESP'] = self._resample(t_master, t_resp_s, s_resp)
 
         if self.have_acq:
-            self.waveforms['ACQ'] = self._resample(t_master, t_acq_s, s_acq)
+            self.physio_df['ACQ'] = self._resample(t_master, t_acq_s, s_acq)
 
-        return self.waveforms
+        return self.physio_df
 
-    def save(self, physio_tsv=None):
+    def to_bids(self, bids_outdir, bids_stub):
 
-        # Create TSV filename if none provided
-        if not physio_tsv:
-            physio_tsv = self._physio_dcm.replace('.dcm', '.tsv')
-
-        print(f'\nSaving physiological waveforms to {physio_tsv}')
-        self.waveforms.to_csv(physio_tsv,
-                              sep='\t',
-                              index=False,
-                              float_format='%0.6f')
+        save_bids_physio(bids_outdir, bids_stub, self.physio_df)
 
     def _parse_log(self, physio_lines):
 
@@ -414,7 +407,7 @@ class PhysioDicom:
             wave_list.append('RESP')
 
         n_wave = len(wave_list)
-        t = self.waveforms['Time_s'].values
+        t = self.physio_df['Time'].values
 
         i_crop = t < 10.0
         t_crop = t[i_crop]
@@ -424,7 +417,7 @@ class PhysioDicom:
 
         for wc, wave in enumerate(wave_list):
 
-            s = self.waveforms[wave].values
+            s = self.physio_df[wave].values
             s_crop = s[i_crop]
 
             axs[wc].plot(t_crop, s_crop)

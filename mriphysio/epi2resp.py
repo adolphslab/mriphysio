@@ -53,7 +53,7 @@ def main():
 
     resp_tsv = args.outfile
     out_dir = op.dirname(resp_tsv)
-    bids_stub = op.splitext(op.basename(resp_tsv))[0]
+    bids_stub = op.basename.splitext(resp_tsv)[0]
 
     # Estimate the respiratory waveform
     resp_obj = PhaseRespWave(args.phasediff, args.weightmask, args.method, args.npca)

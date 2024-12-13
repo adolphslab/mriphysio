@@ -16,6 +16,7 @@ import pandas as pd
 import nibabel as nib
 import scipy as sp
 from sklearn.decomposition import PCA
+from .bidsphysio import save_bids_physio
 
 
 class PhaseRespWave:
@@ -90,7 +91,7 @@ class PhaseRespWave:
 
                 respwave = np.zeros([self.nt, 2])
                 respwave_dict = {
-                    'Time (s)': self.t_s,
+                    'Time': self.t_s,
                     'Resp': mean_dphi_hpf,
                 }
                 self.resp_df = pd.DataFrame(respwave_dict)
@@ -110,7 +111,7 @@ class PhaseRespWave:
 
                 # Construct respiration waveform dataframe
                 resp_headers = [f'Resp{pc+1}' for pc in range(self.n_pca)]
-                self.resp_df = pd.DataFrame(respwave, columns=['Time (s)'] + resp_headers)
+                self.resp_df = pd.DataFrame(respwave, columns=['Time'] + resp_headers)
 
                 # Add peak inhalation/exhalation labels
                 self.resp_peaks()
@@ -133,6 +134,11 @@ class PhaseRespWave:
         self.resp_df.loc[neg_peaks, 'Peak'] = 'Exhalation'
 
         return self.resp_df
+    
+    def to_bids(self, bids_outdir, bids_stub):
+        
+        # Save the respiration waveform to BIDS physio format (tsv.gz + json)
+        save_bids_physio(bids_outdir, bids_stub, self.resp_df)
         
     @staticmethod
     def weighted_pca(X, w, n_pca=1):
@@ -172,52 +178,5 @@ class PhaseRespWave:
         spatial_patterns = pca.components_  # Eigenvectors for spatial patterns
         
         return temporal_components, spatial_patterns, pca
-
-    def to_bids(self, out_dir, bids_stub):
-
-        # Sampling frequency from TR
-        samp_freq = 1.0 / self.tr_s
-
-        # Output physio TSV and JSON filenames
-        tsv_fname = op.join(out_dir, f'{bids_stub}.tsv')
-        json_fname = op.join(out_dir, f'{bids_stub}.json')
-
-        # Save respiration waveform to BIDS physio TSV
-        print(f'Saving respiratory waveform to {tsv_fname}')
-        self.resp_df.to_csv(
-            tsv_fname,
-            sep='\t',
-            index=False,
-            float_format='%0.6f'
-        )
-
-        # Create dictionary of metadata and write to JSON sidecar
-        json_dict = {
-            "SamplingFrequency": samp_freq,
-            "StartTime": self.resp_df['Time (s)'].min(),
-            "Columns": self.resp_df.columns.tolist(),
-            "Time": {
-                "Units": "s"
-            }
-        }
-
-        # Finally write JSON sidecar
-        print(f'Saving JSON sidecar to {json_fname}')
-        self._write_json(json_fname, json_dict, overwrite=True)
-
-    @staticmethod
-    def _write_json(json_fname, json_dict, overwrite=False):
-
-        if op.isfile(json_fname):
-            if overwrite:
-                create_file = True
-            else:
-                create_file = False
-        else:
-            create_file = True
-
-        if create_file:
-            with open(json_fname, 'w') as fd:
-                json.dump(json_dict, fd, indent=4, separators=(',', ':'))
 
 
