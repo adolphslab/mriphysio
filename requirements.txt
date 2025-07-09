@@ -1,4 +1,4 @@
-setuptools~=71.0.4
+setuptools~=80.9.0
 numpy~=1.26.4
 pandas~=2.2.2
 pydicom~=2.4.4
