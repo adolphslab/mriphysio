@@ -1,5 +1,6 @@
 """
-Class for opening and converting a DICOM physiology wave_lines object (CMRR) to TSV text file
+R-wave detection in 3-lead ECG waveforms acquired using an MR scanner
+- lead waveforms contaminated by magnetohydrodynamic effect (T-wave elevation)
 """
 
 import numpy as np
