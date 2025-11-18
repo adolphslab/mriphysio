@@ -103,13 +103,27 @@ def save_bids_physio(bids_outdir, bids_stub, physio_df):
         }
     if 'RESP' in physio_df.columns:
         json_dict['RESP'] = {
-            "Description": "Respiratory waveform",
+            "Description": "Respiratory transducer waveform",
             "Units": "arbitrary"
         }
     if 'ACQ' in physio_df.columns:
         json_dict['ACQ'] = {
             "Description": "Acquisition trigger",
             "Units": "arbitrary"
+        }
+    if 'Resp' in physio_df.columns:
+        json_dict['Resp'] = {
+            "Description": "Phase-derived respiratory waveform",
+            "Units": "arbitrary"
+        }
+    if 'Peak' in physio_df.columns:
+        json_dict['Peak'] = {
+            "Description": "Labels for peak inhalation and exhalation",
+            "Levels": {
+                "Inhalation": "Time point of peak inhalation",
+                "Exhalation": "Time point of peak exhalation",
+                "n/a": "Not a peak"
+            }
         }
 
     # Finally write JSON sidecar

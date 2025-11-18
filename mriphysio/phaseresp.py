@@ -129,7 +129,7 @@ class PhaseRespWave:
         neg_peaks, _ = sp.signal.find_peaks(-self.resp_df['Resp'], distance=min_period)
 
         # Add peak locations to respiration waveform dataframe
-        self.resp_df['Peak'] = ''
+        self.resp_df['Peak'] = 'n/a'
         self.resp_df.loc[pos_peaks, 'Peak'] = 'Inhalation'
         self.resp_df.loc[neg_peaks, 'Peak'] = 'Exhalation'
 
