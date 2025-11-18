@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mriphysio"
+version = "2025.11.18"
+description = "Siemens physiology DICOM and MPCU log conversion"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9, <4"
+authors = [
+    { name = "Julian Michael Tyszka", email = "jmt@caltech.edu" },
+]
+keywords = [
+    "CMRR",
+    "MRI",
+    "Siemens",
+    "conversion",
+    "physiology",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.scripts]
+epi2resp = "mriphysio.epi2resp:main"
+physio2bids = "mriphysio.physio2bids:main"
+
+[project.urls]
+"Bug Reports" = "https://github.com/jmtyszka/thermalfit/issues"
+Funding = "http://cbic.caltech.edu/"
+Homepage = "https://github.com/jmtyszka/mriphysio"
+Source = "https://github.com/jmtyszka/thermalfit/"
+
+[tool.hatch.version]
+path = "mriphysio/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/mriphysio",
+]

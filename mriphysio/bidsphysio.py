@@ -31,6 +31,7 @@ def save_bids_physio(bids_outdir, bids_stub, physio_df):
     - <matches>_physio.tsv.gz files MUST NOT include a header line, as established by the common-principles.
     As a result, when supplying a <matches>_physio.tsv.gz file, an accompanying <matches>_physio.json MUST be
     present to indicate the column names.
+    - All columns require a specification in the JSON sidecar. Column headings only will generate a warning at validation
 
     :param out_dir: str, Path-like
         Directory where BIDS files will be written to.
@@ -74,9 +75,42 @@ def save_bids_physio(bids_outdir, bids_stub, physio_df):
         "StartTime": physio_df['Time'].min(),
         "Columns": physio_df.columns.tolist(),
         "Time": {
+            "Description": "Sample timestamps",
             "Units": "s"
         }
     }
+
+    # Full descriptions for all possible columns
+    if 'ECG1' in physio_df.columns:
+        json_dict['ECG1'] = {
+            "Description": "Electrocardiogram channel 1",
+            "Units": "arbitrary"
+        }
+    if 'ECG2' in physio_df.columns:
+        json_dict['ECG2'] = {
+            "Description": "Electrocardiogram channel 2",
+            "Units": "arbitrary"
+        }
+    if 'ECG3' in physio_df.columns:
+        json_dict['ECG3'] = {
+            "Description": "Electrocardiogram channel 3",
+            "Units": "arbitrary"
+        }
+    if 'ECG4' in physio_df.columns:
+        json_dict['ECG4'] = {
+            "Description": "Electrocardiogram channel 4",
+            "Units": "arbitrary"
+        }
+    if 'RESP' in physio_df.columns:
+        json_dict['RESP'] = {
+            "Description": "Respiratory waveform",
+            "Units": "arbitrary"
+        }
+    if 'ACQ' in physio_df.columns:
+        json_dict['ACQ'] = {
+            "Description": "Acquisition trigger",
+            "Units": "arbitrary"
+        }
 
     # Finally write JSON sidecar
     print(f'Saving JSON sidecar to {json_fname}')
