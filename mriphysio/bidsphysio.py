@@ -80,7 +80,9 @@ def save_bids_physio(bids_outdir, bids_stub, physio_df):
         }
     }
 
-    # Full descriptions for all possible columns
+    # Full definitions for all possible physio columns
+
+    # Siemens integrated physiological waveforms
     if 'ECG1' in physio_df.columns:
         json_dict['ECG1'] = {
             "Description": "Electrocardiogram channel 1",
@@ -106,11 +108,18 @@ def save_bids_physio(bids_outdir, bids_stub, physio_df):
             "Description": "Respiratory transducer waveform",
             "Units": "arbitrary"
         }
+    if 'PULS' in physio_df.columns:
+        json_dict['PULS'] = {
+            "Description": "Peripheral pulse waveform",
+            "Units": "arbitrary"
+        }
     if 'ACQ' in physio_df.columns:
         json_dict['ACQ'] = {
             "Description": "Acquisition trigger",
             "Units": "arbitrary"
         }
+    
+    # Phase-derived respiration columns
     if 'Resp' in physio_df.columns:
         json_dict['Resp'] = {
             "Description": "Phase-derived respiratory waveform",
@@ -124,6 +133,18 @@ def save_bids_physio(bids_outdir, bids_stub, physio_df):
                 "Exhalation": "Time point of peak exhalation",
                 "n/a": "Not a peak"
             }
+        }
+
+    # Derived heart rate columns
+    if 'HeartRateHz' in physio_df.columns:
+        json_dict['HeartRateHz'] = {
+            "Description": "Instantaneous heart rate derived from ECG",
+            "Units": "Hz"
+        }
+    if 'FreqSDHz' in physio_df.columns:
+        json_dict['FreqSDHz'] = {
+            "Description": "Power-weighted standard deviation of fundamental cardiac frequency",
+            "Units": "Hz"
         }
 
     # Finally write JSON sidecar
