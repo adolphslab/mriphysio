@@ -1,6 +1,0 @@
-setuptools~=80.9.0
-numpy~=1.26.4
-pandas~=2.2.2
-pydicom~=2.4.4
-scipy~=1.13.1
-matplotlib~=3.8.4

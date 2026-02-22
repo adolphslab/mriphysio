@@ -37,7 +37,7 @@ import os
 import os.path as op
 import argparse
 
-from phaseresp import PhaseRespWave
+from .phaseresp import PhaseRespWave
 
 
 def main():
@@ -47,7 +47,7 @@ def main():
     parser.add_argument('-p', '--phasediff', required=True, help='Nifti 3D x time phase difference timeseries')
     parser.add_argument('-w', '--weightmask', required=True, help='Nifti weighting mask image')
     parser.add_argument('-m', '--method', default='weighted_mean', help='Spatially weighted mean method')
-    parser.add_argument('-n', '--npca', default=1, type=int, help='Numer of PCA components to retain')  
+    parser.add_argument('-n', '--npca', default=1, type=int, help='Number of PCA components to retain')  
     parser.add_argument('-o', '--outfile', required=True, help='BIDS format repiratory waveform TSV')
     args = parser.parse_args()
 

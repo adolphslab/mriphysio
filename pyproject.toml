@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mriphysio"
-version = "2025.11.18"
+version = "2026.2.21"
 description = "Siemens physiology DICOM and MPCU log conversion"
 readme = "README.md"
 license = "MIT"
@@ -27,16 +27,26 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering",
 ]
+requires-dist = [
+    "numpy>=1.21",
+    "scipy>=1.7",
+    "pydicom>=2.3",
+    "nibabel>=3.2",
+    "tqdm>=4.62",
+    "pandas>=1.3",
+    "python-dateutil>=2.8",
+    "h5py>=3.4",
+]
 
 [project.scripts]
 epi2resp = "mriphysio.epi2resp:main"
 physio2bids = "mriphysio.physio2bids:main"
 
 [project.urls]
-"Bug Reports" = "https://github.com/jmtyszka/thermalfit/issues"
+"Bug Reports" = "https://github.com/jmtyszka/mriphysio/issues"
 Funding = "http://cbic.caltech.edu/"
 Homepage = "https://github.com/jmtyszka/mriphysio"
-Source = "https://github.com/jmtyszka/thermalfit/"
+Source = "https://github.com/jmtyszka/mriphysio/"
 
 [tool.hatch.version]
 path = "mriphysio/__init__.py"
